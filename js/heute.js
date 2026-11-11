@@ -2,10 +2,10 @@
 import { S, speichereEinheit, setEinst } from './store.js';
 import {
   tagHeute, eintragFuer, sichereEinheit, plaetze, reihenfolge, satzVon, vorschlag,
-  wochenStand, faelligeErinnerungen, tagIds,
+  wochenStand, faelligeErinnerungen, tagIds, zusammenfassung, zusammenfassungHtml,
 } from './training.js';
 import * as timer from './timer.js';
-import { bandPunkt, messungEintragen } from './ui.js';
+import { bandPunkt, messungEintragen, zahlEingeben } from './ui.js';
 import { FREI } from './progression.js';
 import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast } from './util.js';
 
@@ -125,7 +125,8 @@ function renderSheet(sheet, aktiv) {
   }
   if (!aktiv) {
     const w = wochenStand();
-    html += `<div class="fertig"><b>💪 Training geschafft!</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · tippe einen Kreis an, um einen Satz zu ändern.</span></div>`;
+    const z = zusammenfassung(ctx.einheit);
+    html += `<div class="fertig"><b>💪 Training geschafft!</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
     sheet.innerHTML = html;
     return;
   }
@@ -141,7 +142,7 @@ function renderSheet(sheet, aktiv) {
 
   let zweites = '';
   if (p.typ === 'hantel') {
-    zweites = `<div><small>kg pro Hantel</small><div class="st"><button data-a="kg-minus">−</button><b>${fmtZahl(werte.kg ?? p.kg)}</b><button data-a="kg-plus">+</button></div></div>`;
+    zweites = `<div><small>kg pro Hantel</small><div class="st"><button data-a="kg-minus">−</button><b class="tippbar" data-a="kg-tippen">${fmtZahl(werte.kg ?? p.kg)}</b><button data-a="kg-plus">+</button></div></div>`;
   } else if (p.typ === 'band') {
     const b = werte.band ?? p.band;
     zweites = `<div><small>Band</small><div class="st"><button data-a="band-minus" aria-label="leichteres Band">‹</button><b class="klein">${bandPunkt(b)}${esc(b)}</b><button data-a="band-plus" aria-label="schwereres Band">›</button></div></div>`;
@@ -153,7 +154,7 @@ function renderSheet(sheet, aktiv) {
   html += `
     <div class="sh-kopf"><h4>${esc(teilName(ex, eintrag, aktiv.teil))} · Satz ${aktiv.nr + 1} <span>· ${zielKurz}</span></h4>${loeschen}${extra}</div>
     <div class="inp">
-      <div><small>Wiederholungen</small><div class="st"><button data-a="wdh-minus">−</button><b>${werte.wdh}</b><button data-a="wdh-plus">+</button></div></div>
+      <div><small>Wiederholungen</small><div class="st"><button data-a="wdh-minus">−</button><b class="tippbar" data-a="wdh-tippen">${werte.wdh}</b><button data-a="wdh-plus">+</button></div></div>
       ${zweites}
     </div>
     ${gespeichert
@@ -172,6 +173,8 @@ async function aendereWert(feld, delta) {
   const ziel = gespeichert || entwurf;
   const baender = S.einst.baender;
   if (feld === 'wdh') ziel.wdh = Math.max(0, Math.min(200, ziel.wdh + delta));
+  if (feld === 'wdh-setzen') ziel.wdh = Math.max(0, Math.min(200, delta));
+  if (feld === 'kg-setzen') ziel.kg = Math.max(0, delta);
   if (feld === 'kg') {
     const step = (S.uebungen[aktiv.uebung]?.schritt ?? 2.5) / 2;
     ziel.kg = Math.max(0, Math.round(((ziel.kg ?? p.kg) + delta * step) * 100) / 100);
@@ -274,6 +277,16 @@ function verbinde(view, sheet) {
     else if (a === 'wdh-plus') aendereWert('wdh', 1);
     else if (a === 'kg-minus') aendereWert('kg', -1);
     else if (a === 'kg-plus') aendereWert('kg', 1);
+    else if (a === 'kg-tippen' || a === 'wdh-tippen') {
+      const istKg = a === 'kg-tippen';
+      zahlEingeben({
+        titel: istKg ? 'Gewicht pro Hantel' : 'Wiederholungen',
+        wert: +el.textContent.replace(',', '.'),
+        einheit: istKg ? 'kg' : 'Wdh.',
+        ganz: !istKg,
+        max: istKg ? 200 : 200,
+      }, v => aendereWert(istKg ? 'kg-setzen' : 'wdh-setzen', v));
+    }
     else if (a === 'band-minus') aendereWert('band', -1);
     else if (a === 'band-plus') aendereWert('band', 1);
     else if (a === 'speichern') speichereSatz();

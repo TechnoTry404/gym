@@ -121,6 +121,32 @@ export function vorschlag(eintrag, teil, nr, einheitId) {
   return v;
 }
 
+// ---------- Zusammenfassung eines Trainings ----------
+// Dauer = erster bis letzter Satz (+ eine Pause für den letzten Satz).
+// Gewicht = Summe aus kg × Wiederholungen aller Hantel-Sätze (kg pro Hantel, so wie eingetragen).
+export function zusammenfassung(einheit) {
+  const saetze = (einheit?.eintraege || []).flatMap(en => en.saetze.map(s => ({ s, p: en.ziel?.teile?.[s.teil] })));
+  if (!saetze.length) return null;
+  const zeiten = saetze.map(x => x.s.t).filter(Number.isFinite);
+  const minuten = zeiten.length ? Math.max(1, Math.round((Math.max(...zeiten) - Math.min(...zeiten) + (S.einst.pauseSek || 90) * 1000) / 60000)) : null;
+  let kg = 0;
+  for (const { s, p } of saetze) {
+    if (p?.typ !== 'hantel') continue;
+    kg += (typeof s.kg === 'number' ? s.kg : p.kg || 0) * s.wdh;
+  }
+  return { minuten, kg: Math.round(kg), saetze: saetze.length, wdh: saetze.reduce((n, x) => n + x.s.wdh, 0) };
+}
+
+export function zusammenfassungHtml(z) {
+  const dauer = z.minuten == null ? '–' : z.minuten >= 60 ? `${Math.floor(z.minuten / 60)} Std. ${z.minuten % 60} Min.` : `${z.minuten} Min.`;
+  return `<div class="summe">
+    <div>⏱ Zeit<b>${dauer}</b></div>
+    <div>🏋️ Gewicht bewegt<b>${z.kg.toLocaleString('de-DE')} kg</b></div>
+    <div>Sätze<b>${z.saetze}</b></div>
+    <div>Wiederholungen<b>${z.wdh}</b></div>
+  </div>`;
+}
+
 // ---------- Motivation ----------
 export function wochenStand() {
   const ziel = S.einst.wochenZiel || 3;

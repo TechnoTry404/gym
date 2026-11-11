@@ -31,6 +31,31 @@ export function schliesseModal() {
   cb?.();
 }
 
+// Zahl per Tastatur eingeben (z. B. Gewicht eines Satzes). Übernimmt beim Tippen auf „Fertig“ oder Enter.
+export function zahlEingeben({ titel, wert, einheit, ganz = false, max = 500 }, beiWert) {
+  modal(`
+    <h3>${esc(titel)}</h3>
+    <input class="gross" id="zahlwert" type="text" inputmode="${ganz ? 'numeric' : 'decimal'}" value="${wert == null ? '' : fmtZahl(wert)}" autocomplete="off">
+    <p class="muted" style="text-align:center">${esc(einheit)}</p>
+    <button class="knopf haupt" data-a="fertig">Fertig</button>
+  `, root => {
+    const inp = root.querySelector('#zahlwert');
+    let fertig = false;
+    const uebernehmen = () => {
+      if (fertig) return;
+      const roh = inp.value.replace(',', '.').trim();
+      const zahl = Number(roh);
+      if (roh === '' || !Number.isFinite(zahl) || zahl < 0 || zahl > max) { toast('Bitte eine gültige Zahl eingeben'); return; }
+      fertig = true;
+      beiWert(ganz ? Math.round(zahl) : Math.round(zahl * 100) / 100);
+      schliesseModal();
+    };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') uebernehmen(); });
+    root.querySelector('[data-a=fertig]').addEventListener('click', uebernehmen);
+    setTimeout(() => { inp.focus(); inp.select(); }, 50);
+  });
+}
+
 // Messwert eintragen. Speichert bei jeder Eingabe automatisch (kein Speichern-Knopf).
 export function messungEintragen(art, beimSchliessen, vorhandene = null) {
   const info = MESS_ARTEN[art];

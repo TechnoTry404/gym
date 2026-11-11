@@ -1,6 +1,6 @@
 // Fortschritt: Kraft-Übersicht (seit Tag 1 / letzte 30 Tage), Körperdaten mit Grafiken, Verlauf.
 import { S, speichereEinheit, loescheEinheit, loescheMessung } from './store.js';
-import { einheitenSortiert, hatSaetze, MESS_ARTEN } from './training.js';
+import { einheitenSortiert, hatSaetze, MESS_ARTEN, zusammenfassung as trainingsSumme, zusammenfassungHtml } from './training.js';
 import { leistung, FREI } from './progression.js';
 import { linie, balken } from './charts.js';
 import { messungEintragen, bandPunkt } from './ui.js';
@@ -239,10 +239,9 @@ function verlauf() {
   const liste = einheitenSortiert().filter(hatSaetze).reverse();
   if (!liste.length) return '<div class="leer">Noch kein Training eingetragen.</div>';
   return liste.map(e => {
-    const saetze = e.eintraege.reduce((s, x) => s + x.saetze.length, 0);
-    const wdh = e.eintraege.reduce((s, x) => s + x.saetze.reduce((t, y) => t + y.wdh, 0), 0);
+    const z = trainingsSumme(e);
     return `<button class="ex" data-a="einheit" data-id="${e.id}"><div class="vl"><div class="tagbadge">${esc(e.tag)}</div></div>
-      <div class="n"><b>${esc(fmtDatumLang(e.datum))}</b><span>Tag ${esc(e.tag)}${S.tage[e.tag] ? ' · ' + esc(S.tage[e.tag].name) : ''} · ${saetze} Sätze · ${wdh} Wdh.</span></div><span class="chev">›</span></button>`;
+      <div class="n"><b>${esc(fmtDatumLang(e.datum))}</b><span>${z.minuten ?? '–'} Min. · ${z.kg.toLocaleString('de-DE')} kg · ${z.saetze} Sätze · ${z.wdh} Wdh.</span></div><span class="chev">›</span></button>`;
   }).join('');
 }
 
@@ -250,7 +249,8 @@ function detailEinheit(id) {
   const e = S.einheiten.find(x => x.id === id);
   if (!e) { unter = null; modus = 'verlauf'; return verlauf(); }
   let html = `<button class="zurueck" data-a="zurueck">‹ Verlauf</button>
-    <div class="pad"><h1>Tag ${esc(e.tag)}</h1><p class="muted">${esc(fmtDatumLang(e.datum))} · Änderungen werden sofort gespeichert</p></div>`;
+    <div class="pad"><h1>Tag ${esc(e.tag)}</h1><p class="muted">${esc(fmtDatumLang(e.datum))} · Änderungen werden sofort gespeichert</p>
+    ${trainingsSumme(e) ? zusammenfassungHtml(trainingsSumme(e)) : ''}</div><div style="height:12px"></div>`;
   for (const en of e.eintraege) {
     if (!en.saetze.length) continue;
     const ex = S.uebungen[en.uebung];

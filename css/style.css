@@ -112,6 +112,10 @@ h2 { font-size: 24px; line-height: 1.15; }
 .st button { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--knopf); font-size: 22px; display: flex; align-items: center; justify-content: center; }
 .st b { font-size: 26px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st b.klein { font-size: 18px; }
+.tippbar { cursor: pointer; border-bottom: 2px dotted rgba(232,121,249,.6); padding: 0 4px; }
+.summe { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.summe > div { background: var(--card2); border-radius: 14px; padding: 8px 10px; text-align: left; font-size: 12px; color: var(--muted); }
+.summe b { display: block; color: #fff; font-size: 22px; font-weight: 800; }
 .bandpunkt { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; border: 1px solid rgba(255,255,255,.3); }
 .ok { width: 100%; margin-top: 10px; background: var(--grad); height: 58px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
 .ok:active, .knopf:active { transform: scale(.98); filter: brightness(1.1); }
