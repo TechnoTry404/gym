@@ -64,12 +64,47 @@ function rangAnsicht() {
       <div class="muted">${g.disziplin.naechste != null ? `Noch ${(g.disziplin.naechste - g.xp).toLocaleString('de-DE')} XP bis ${RAENGE[g.disziplin.i + 1]}` : 'Höchster Rang erreicht'}</div>
       <p class="info">Training +100 · komplett +50 · Wochenziel +150 · Serie +25 je Woche · Rekord +30 · Steigerung +20 · Woche ausgelassen −200</p>
     </div>
-    <div class="titel2">KRAFT JE ÜBUNG · LETZTE 6 WOCHEN</div>`;
-  for (const x of g.uebungen) {
-    if (x.ohneDaten) {
-      html += `<div class="rangzeile"><div class="n"><b>${esc(x.ex.name)}</b><span>Noch nicht trainiert (6 Wochen)</span></div><span class="rang" style="opacity:.35"><i></i>–</span></div>`;
-      continue;
+`;
+  // Kraft kompakt: wie viele Übungen in welchem Rang – Details über den Knopf.
+  const mitDaten = g.uebungen.filter(x => !x.ohneDaten);
+  const verteilung = RAENGE.map((_, i) => mitDaten.filter(x => x.i === i).length);
+  html += `
+    <button class="karte" data-a="raenge-uebungen">
+      <span class="tap">Je Übung ›</span>
+      <b>💪 Kraft</b>
+      <p class="muted" style="margin:4px 0 10px">${mitDaten.length ? `${mitDaten.length} von ${g.uebungen.length} Übungen bewertet (letzte 6 Wochen)` : 'Noch keine Übung trainiert'}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${verteilung.map((n, i) => (n ? `<span class="rang r${i}"><i></i>${n} × ${RAENGE[i]}</span>` : '')).join('') || '<span class="muted">–</span>'}</div>
+    </button>
+    <p class="info pad">So wird gerechnet: Für jede Übung schätzt die App dein Maximalgewicht für 1 Wiederholung (aus deinem besten Satz) und teilt es durch dein Körpergewicht (${fmtZahl(bw.kg)} kg${bw.geschaetzt ? ', geschätzt – trag dein Gewicht unter „Körper“ ein' : ''}). Richtwerte angelehnt an strengthlevel.com. Der Gesamtrang ist der Durchschnitt aller Übungs-Ränge, gerundet (z. B. 4 × Gold + 2 × Silber = Gold). Ist deine Disziplin höher, hebt sie den Schnitt etwas an – sie zieht ihn nie nach unten.</p>`;
+  return html;
+}
+
+// Unterseite: Rang je Übung, nach Trainingstag sortiert.
+function raengeJeUebung() {
+  const g = gesamtRang();
+  const pct = x => Math.round(x * 100);
+  const nachId = Object.fromEntries(g.uebungen.map(x => [x.ex.id, x]));
+  const gezeigt = new Set();
+  let html = `<button class="zurueck" data-a="zurueck-rang">‹ Rang</button>
+    <div class="pad"><h1>Rang je Übung</h1><p class="muted">Beste Leistung der letzten 6 Wochen</p></div>`;
+  const nichtTrainiert = [];
+  for (const tag of Object.values(S.tage).sort((a, b) => a.id.localeCompare(b.id))) {
+    const zeilen = [];
+    for (const id of tag.paare.flat()) {
+      const x = nachId[id];
+      if (!x || gezeigt.has(id)) continue;
+      gezeigt.add(id);
+      if (x.ohneDaten) { nichtTrainiert.push(x.ex.name); continue; }
+      zeilen.push(rangZeile(x, pct));
     }
+    if (zeilen.length) html += `<div class="titel2">TAG ${esc(tag.id)} · ${esc(tag.name.toUpperCase())}</div>` + zeilen.join('');
+  }
+  if (nichtTrainiert.length) html += `<p class="info pad">Noch ohne Rang (in 6 Wochen nicht trainiert): ${esc(nichtTrainiert.join(', '))}</p>`;
+  return html;
+}
+
+function rangZeile(x, pct) {
+  {
     const wdh = Math.min(x.satz.wdh, 20);
     const faktor = 1 + wdh / 30;
     const hilfe = x.teil?.typ === 'hilfe-kg';
@@ -81,14 +116,18 @@ function rangAnsicht() {
         ? `Für ${RAENGE[x.i + 1]}: ${Math.max(0, x.bw - kg) > 0 ? '≈ ' + fmtZahl(Math.floor(Math.max(0, x.bw - kg) * 2) / 2) + ' kg Hilfe' : 'ohne Hilfe'} × ${wdh}`
         : `Für ${RAENGE[x.i + 1]}: ≈ ${fmtZahl(Math.ceil(kg * 2) / 2)} kg × ${wdh}`;
     }
-    html += `<div class="rangzeile"><div class="n"><b>${esc(x.ex.name)}</b><span>Bestwert ${esc(jetzt)} · 1RM ≈ ${fmtZahl(Math.round(x.e1rm))} kg</span><em>${esc(ziel)}</em>
+    return `<div class="rangzeile"><div class="n"><b>${esc(x.ex.name)}</b><span>Bestwert ${esc(jetzt)} · 1RM ≈ ${fmtZahl(Math.round(x.e1rm))} kg</span><em>${esc(ziel)}</em>
       <div class="balken"><div style="width:${pct(x.anteil)}%"></div></div></div>${rangChip(x.i)}</div>`;
   }
-  html += `<p class="info pad">So wird gerechnet: Für jede Übung schätzt die App dein Maximalgewicht für 1 Wiederholung (aus deinem besten Satz) und teilt es durch dein Körpergewicht (${fmtZahl(bw.kg)} kg${bw.geschaetzt ? ', geschätzt – trag dein Gewicht unter „Körper“ ein' : ''}). Richtwerte angelehnt an strengthlevel.com. Der Gesamtrang ist der Durchschnitt aller Übungs-Ränge, gerundet (z. B. 4 × Gold + 2 × Silber = Gold). Ist deine Disziplin höher, hebt sie den Schnitt etwas an – sie zieht ihn nie nach unten.</p>`;
-  return html;
 }
 
 // ---------- Berechnungen ----------
+// Nur Übungen, die im aktuellen Plan stehen (alte Übungen bleiben im Verlauf, aber nicht in Kraft/Rekorden).
+function planUebungen() {
+  const ids = new Set(Object.values(S.tage).flatMap(t => t.paare.flat()));
+  return [...ids].map(id => S.uebungen[id]).filter(Boolean);
+}
+
 function verlaufUebung(ex) {
   const out = [];
   for (const e of einheitenSortiert()) {
@@ -123,7 +162,7 @@ function vergleich(ex, zr) {
 }
 
 function alleVergleiche(zr) {
-  return Object.values(S.uebungen)
+  return planUebungen()
     .map(ex => ({ ex, v: vergleich(ex, zr) }))
     .filter(x => x.v);
 }
@@ -143,7 +182,7 @@ function zusammenfassung(zr) {
 function rekorde() {
   const start = addTage(heute(), -30);
   const out = [];
-  for (const ex of Object.values(S.uebungen)) {
+  for (const ex of planUebungen()) {
     const v = verlaufUebung(ex);
     let best = v[0]?.wert ?? 0;
     for (let i = 1; i < v.length; i++) {
@@ -215,6 +254,7 @@ export function renderFortschritt(view) {
   let html = '';
   if (unter && typeof unter === 'object' && unter.uebung) html = detailUebung(unter.uebung);
   else if (unter === 'liste') html = listeUebungen();
+  else if (unter === 'raenge') html = raengeJeUebung();
   else if (unter && typeof unter === 'object' && unter.einheit) html = detailEinheit(unter.einheit);
   else {
     html = `<div class="pad"><h1>Fortschritt</h1></div>
@@ -390,6 +430,8 @@ async function klick(ev) {
   else if (a === 'zeitraum') { zeitraum = el.dataset.z; }
   else if (a === 'uebung') { unter = { uebung: el.dataset.u, von: unter }; }
   else if (a === 'zurueck') { unter = null; }
+  else if (a === 'raenge-uebungen') { unter = 'raenge'; }
+  else if (a === 'zurueck-rang') { unter = null; modus = 'rang'; }
   else if (a === 'zurueck-liste') { unter = unter?.von === 'liste' ? 'liste' : null; }
   else if (a === 'einheit') { unter = { einheit: el.dataset.id }; }
   else if (a === 'alle-raenge') { alleRaengeZeigen(); return; }
