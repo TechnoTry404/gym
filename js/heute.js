@@ -6,6 +6,7 @@ import {
 } from './training.js';
 import * as timer from './timer.js';
 import { bandPunkt, messungEintragen, zahlEingeben } from './ui.js';
+import { gesamtRang, xpFuer, RAENGE } from './rang.js';
 import { FREI } from './progression.js';
 import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast } from './util.js';
 
@@ -61,6 +62,17 @@ function naechsterPlatz() {
   return null;
 }
 
+// Rang-Abzeichen oben + Aufstieg melden.
+function rangKnopf() {
+  const g = gesamtRang();
+  const alt = S.einst.letzterRang;
+  if (alt == null || g.i !== alt) {
+    if (alt != null && g.i > alt) setTimeout(() => toast(`🎉 Aufstieg! Du bist jetzt ${RAENGE[g.i]}`, 4000), 300);
+    setEinst('letzterRang', g.i);
+  }
+  return `<button class="rang r${g.i}" data-a="rang"><i></i>${RAENGE[g.i]}</button>`;
+}
+
 export function renderHeute(view, sheet) {
   ctx = baueKontext();
   if (!ctx.tag) {
@@ -82,7 +94,7 @@ export function renderHeute(view, sheet) {
       <div class="titel">
         <h1>Tag ${esc(ctx.tagId)} · ${esc(ctx.tag.name)}</h1>
         <p class="muted">${esc(fmtDatumLang(trainingsDatum()))}${darfWechseln ? `<button class="tagwechsel" data-a="tagwechsel">Tag wechseln</button>` : ''}</p>
-        <span class="fire">🔥 ${w.serie} ${w.serie === 1 ? 'Woche' : 'Wochen'} Serie</span>
+        <span class="fire">🔥 ${w.serie} ${w.serie === 1 ? 'Woche' : 'Wochen'} Serie</span>${rangKnopf()}
       </div>
     </div>`;
 
@@ -128,7 +140,8 @@ function renderSheet(sheet, aktiv) {
   if (!aktiv) {
     const w = wochenStand();
     const z = zusammenfassung(ctx.einheit);
-    html += `<div class="fertig"><b>💪 Training geschafft!</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
+    const xp = ctx.einheit ? xpFuer(ctx.einheit.id) : 0;
+    html += `<div class="fertig"><b>💪 Training geschafft! <span class="up">+${xp} XP</span></b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
     sheet.innerHTML = html;
     return;
   }
@@ -261,6 +274,8 @@ function verbinde(view, sheet) {
       auswahl = frei || null;
       entwurf = null;
       rerender();
+    } else if (a === 'rang') {
+      document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'fortschritt', modus: 'rang' } }));
     } else if (a === 'tagwechsel') {
       const ids = tagIds();
       const i = ids.indexOf(ctx.tagId);

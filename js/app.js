@@ -2,7 +2,7 @@
 import { ladeAlles, S } from './store.js';
 import { dauerhaftAnfragen } from './db.js';
 import { renderHeute, heuteInit, heuteTick } from './heute.js';
-import { renderFortschritt, fortschrittZuruecksetzen } from './fortschritt.js';
+import { renderFortschritt, fortschrittZuruecksetzen, fortschrittModus } from './fortschritt.js';
 import { renderPlan, renderMehr } from './einstellungen.js';
 import { exportieren } from './backup.js';
 import * as timer from './timer.js';
@@ -48,6 +48,11 @@ async function start() {
 
   document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { zeige(b.dataset.tab); window.scrollTo(0, 0); }));
   new ResizeObserver(sheetHoehe).observe($('#sheet'));
+  document.addEventListener('gym-tab', e => {
+    if (e.detail?.modus) fortschrittModus(e.detail.modus);
+    zeige(e.detail.tab);
+    window.scrollTo(0, 0);
+  });
 
   // Mitternacht oder App lange im Hintergrund: Heute-Bildschirm auffrischen.
   document.addEventListener('visibilitychange', () => {

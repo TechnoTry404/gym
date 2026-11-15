@@ -112,6 +112,21 @@ h2 { font-size: 24px; line-height: 1.15; }
 .st button { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--knopf); font-size: 22px; display: flex; align-items: center; justify-content: center; }
 .st b { font-size: 26px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st b.klein { font-size: 18px; }
+/* Ränge */
+.rang { --c: #cd7f32; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 20px; padding: 3px 10px 3px 6px; white-space: nowrap; }
+.rang i { width: 14px; height: 14px; background: var(--c); clip-path: polygon(50% 0, 100% 30%, 82% 100%, 18% 100%, 0 30%); display: inline-block; }
+.rang.r0 { --c: #d08a4c; } .rang.r1 { --c: #cbd5e1; } .rang.r2 { --c: #facc15; }
+.rang.r3 { --c: #67e8f9; } .rang.r4 { --c: #34d399; } .rang.r5 { --c: #fb7185; }
+.rang.gross { font-size: 26px; padding: 8px 18px 8px 12px; gap: 10px; }
+.rang.gross i { width: 30px; height: 30px; }
+button.rang { margin-left: 6px; margin-top: 6px; }
+.balken { height: 8px; border-radius: 5px; background: var(--knopf); overflow: hidden; margin: 8px 0 4px; }
+.balken div { height: 100%; background: var(--grad); border-radius: 5px; }
+.rangzeile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid rgba(255,255,255,.07); border-radius: 16px; margin: 0 16px 8px; }
+.rangzeile .n { flex: 1; min-width: 0; }
+.rangzeile .n b { display: block; font-size: 15px; }
+.rangzeile .n span { display: block; font-size: 12px; color: var(--muted); }
+.rangzeile .n em { display: block; font-style: normal; font-size: 12px; color: var(--teal); }
 .tippbar { cursor: pointer; border-bottom: 2px dotted rgba(232,121,249,.6); padding: 0 4px; }
 .summe { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .summe > div { background: var(--card2); border-radius: 14px; padding: 8px 10px; text-align: left; font-size: 12px; color: var(--muted); }

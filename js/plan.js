@@ -90,4 +90,29 @@ export const ARTEN = {
   'ausdauer': 'Ausdauer (Minuten)',
 };
 
+// Kraft-Richtwerte je Übung: geschätztes Maximalgewicht (1 Wdh.) ÷ Körpergewicht
+// für [Anfänger, Einsteiger, Fortgeschritten, Sehr fortgeschritten, Elite] (Männer).
+// Angelehnt an strengthlevel.com (z. B. Latzug 0,5 / 0,75 / 1,0 / 1,5 / 1,75), Rest geschätzt und gerundet.
+// Kurzhanteln: pro Hantel. Klimmzug-Maschine: bewegtes Gewicht = Körpergewicht − Unterstützung.
+export const RANG_STANDARDS = {
+  schraegbank_kh: [0.15, 0.28, 0.45, 0.65, 0.9],
+  brustpresse: [0.4, 0.65, 1.0, 1.4, 1.85],
+  schraegbank_maschine: [0.35, 0.6, 0.9, 1.3, 1.7],
+  kabelrudern: [0.5, 0.75, 1.05, 1.4, 1.8],
+  latzug: [0.5, 0.75, 1.0, 1.5, 1.75],
+  seitheben_kabel: [0.05, 0.1, 0.18, 0.28, 0.4],
+  beinpresse: [1.0, 1.75, 2.75, 4.0, 5.25],
+  schulterpresse: [0.3, 0.5, 0.8, 1.15, 1.55],
+  facepull_kabel: [0.25, 0.4, 0.6, 0.85, 1.1],
+  curls_kabel: [0.2, 0.35, 0.55, 0.8, 1.1],
+  trizeps_kabel: [0.2, 0.4, 0.65, 0.95, 1.3],
+  beinbeuger: [0.35, 0.55, 0.85, 1.2, 1.6],
+  rudern: [0.2, 0.35, 0.55, 0.8, 1.1],
+  fliegende_kabel: [0.1, 0.2, 0.35, 0.55, 0.8],
+  hammercurls: [0.1, 0.2, 0.32, 0.48, 0.65],
+  trizeps_kopf_kabel: [0.15, 0.3, 0.5, 0.75, 1.05],
+  klimmzug_maschine: [0.5, 0.8, 1.1, 1.35, 1.6],
+  klimmzug_neutral: [0.5, 0.8, 1.1, 1.35, 1.6],
+};
+
 export const WOCHENTAGE = ['—', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']; // Index 1 = Montag

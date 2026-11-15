@@ -3,6 +3,7 @@ import { S, speichereEinheit, loescheEinheit, loescheMessung } from './store.js'
 import { einheitenSortiert, hatSaetze, MESS_ARTEN, zusammenfassung as trainingsSumme, zusammenfassungHtml } from './training.js';
 import { leistung, FREI } from './progression.js';
 import { linie, balken } from './charts.js';
+import { gesamtRang, rangChip, RAENGE, koerpergewicht as koerpergewichtRang } from './rang.js';
 import { messungEintragen, bandPunkt } from './ui.js';
 import { esc, heute, addTage, fmtZahl, fmtDatumLang, fmtDatumKurz, vorTagen } from './util.js';
 
@@ -12,6 +13,52 @@ let zeitraum = '30';          // 'alle' | '30'
 let viewRef;
 
 export function fortschrittZuruecksetzen() { unter = null; }
+export function fortschrittModus(m) { modus = m; unter = null; }
+
+// ---------- Rang ----------
+function rangAnsicht() {
+  const g = gesamtRang();
+  const bw = koerpergewichtRang();
+  const pct = x => Math.round(x * 100);
+  const schnittText = g.kraftSchnitt == null
+    ? 'Noch keine Kraftwerte – zählt bisher nur die Disziplin.'
+    : `Kraft im Schnitt ${RAENGE[Math.round(g.kraftSchnitt)]} (${g.uebungen.filter(x => !x.ohneDaten).length} Übungen) · Disziplin ${RAENGE[g.disziplin.i]}`;
+  let html = `
+    <div class="karte" style="text-align:center">
+      <div class="muted">Dein Rang</div>
+      <div style="margin:10px 0"><span class="rang gross r${g.i}"><i></i>${RAENGE[g.i]}</span></div>
+      <div class="muted">${esc(schnittText)}</div>
+    </div>
+    <div class="karte">
+      <div class="t" style="display:flex;justify-content:space-between;align-items:center"><b>⚡ Disziplin</b>${rangChip(g.disziplin.i)}</div>
+      <div class="pct" style="font-size:34px">${g.xp.toLocaleString('de-DE')} <small>XP</small></div>
+      <div class="balken"><div style="width:${pct(g.disziplin.anteil)}%"></div></div>
+      <div class="muted">${g.disziplin.naechste != null ? `Noch ${(g.disziplin.naechste - g.xp).toLocaleString('de-DE')} XP bis ${RAENGE[g.disziplin.i + 1]}` : 'Höchster Rang erreicht'}</div>
+      <p class="info">Training +100 · komplett +50 · Wochenziel +150 · Serie +25 je Woche · Rekord +30 · Steigerung +20 · Woche ausgelassen −200</p>
+    </div>
+    <div class="titel2">KRAFT JE ÜBUNG · LETZTE 6 WOCHEN</div>`;
+  for (const x of g.uebungen) {
+    if (x.ohneDaten) {
+      html += `<div class="rangzeile"><div class="n"><b>${esc(x.ex.name)}</b><span>Noch nicht trainiert (6 Wochen)</span></div><span class="rang" style="opacity:.35"><i></i>–</span></div>`;
+      continue;
+    }
+    const wdh = Math.min(x.satz.wdh, 20);
+    const faktor = 1 + wdh / 30;
+    const hilfe = x.teil?.typ === 'hilfe-kg';
+    const jetzt = hilfe ? `${fmtZahl(x.satz.kg ?? x.teil.kg)} kg Hilfe × ${x.satz.wdh}` : `${fmtZahl(x.satz.kg ?? x.teil.kg)} kg × ${x.satz.wdh}`;
+    let ziel = 'Höchster Rang erreicht';
+    if (x.naechste != null) {
+      const kg = x.naechste / faktor;
+      ziel = hilfe
+        ? `Für ${RAENGE[x.i + 1]}: ${Math.max(0, x.bw - kg) > 0 ? '≈ ' + fmtZahl(Math.floor(Math.max(0, x.bw - kg) * 2) / 2) + ' kg Hilfe' : 'ohne Hilfe'} × ${wdh}`
+        : `Für ${RAENGE[x.i + 1]}: ≈ ${fmtZahl(Math.ceil(kg * 2) / 2)} kg × ${wdh}`;
+    }
+    html += `<div class="rangzeile"><div class="n"><b>${esc(x.ex.name)}</b><span>Bestwert ${esc(jetzt)} · 1RM ≈ ${fmtZahl(Math.round(x.e1rm))} kg</span><em>${esc(ziel)}</em>
+      <div class="balken"><div style="width:${pct(x.anteil)}%"></div></div></div>${rangChip(x.i)}</div>`;
+  }
+  html += `<p class="info pad">So wird gerechnet: Für jede Übung schätzt die App dein Maximalgewicht für 1 Wiederholung (aus deinem besten Satz) und teilt es durch dein Körpergewicht (${fmtZahl(bw.kg)} kg${bw.geschaetzt ? ', geschätzt – trag dein Gewicht unter „Körper“ ein' : ''}). Richtwerte angelehnt an strengthlevel.com. Der Gesamtrang ist der Durchschnitt aller Übungs-Ränge, gerundet (z. B. 4 × Gold + 2 × Silber = Gold). Ist deine Disziplin höher, hebt sie den Schnitt etwas an – sie zieht ihn nie nach unten.</p>`;
+  return html;
+}
 
 // ---------- Berechnungen ----------
 function verlaufUebung(ex) {
@@ -143,9 +190,9 @@ export function renderFortschritt(view) {
   else if (unter && typeof unter === 'object' && unter.einheit) html = detailEinheit(unter.einheit);
   else {
     html = `<div class="pad"><h1>Fortschritt</h1></div>
-      <div class="seg">${[['kraft', 'Kraft'], ['koerper', 'Körper'], ['verlauf', 'Verlauf']]
+      <div class="seg">${[['rang', 'Rang'], ['kraft', 'Kraft'], ['koerper', 'Körper'], ['verlauf', 'Verlauf']]
         .map(([k, t]) => `<button class="${modus === k ? 'on' : ''}" data-a="modus" data-k="${k}">${t}</button>`).join('')}</div>`;
-    html += modus === 'kraft' ? kraft() : modus === 'koerper' ? koerper() : verlauf();
+    html += modus === 'rang' ? rangAnsicht() : modus === 'kraft' ? kraft() : modus === 'koerper' ? koerper() : verlauf();
   }
   view.innerHTML = html;
   view.onclick = klick;
