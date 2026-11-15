@@ -1,6 +1,6 @@
 // Alle Daten im Arbeitsspeicher (schnell) + sofort in die Datenbank schreiben (kein Speichern-Knopf).
 import * as db from './db.js';
-import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION } from './plan.js';
+import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION, TAUSCH_V3 } from './plan.js';
 import { heute, toast } from './util.js';
 
 export const S = { uebungen: {}, tage: {}, einheiten: [], messungen: [], einst: {} };
@@ -29,6 +29,23 @@ export async function ladeAlles() {
 // Einmalige Umstellung auf einen neuen Standardplan (z. B. Heim → Gym).
 // Alte Übungen und alle Trainings bleiben erhalten (Verlauf, Kraft-Übersicht); nur die Tage werden ersetzt.
 async function planUmstellen() {
+  const alt = S.einst.planVersion || 1;
+  if (alt >= 2) {
+    // Schritt 2 → 3: Freitag umbauen (Rudern/Schrägbank/Fliegende → Rudermaschine/Brustpresse/Butterfly).
+    // Nur austauschen – deine übrigen Änderungen am Plan bleiben.
+    const neu = STANDARD_UEBUNGEN.filter(u => !S.uebungen[u.id]);
+    const tage = Object.values(S.tage).map(t => ({ ...t, paare: t.paare.map(p => p.map(id => TAUSCH_V3[id] || id)) }));
+    await db.vieleSpeichern([
+      ...neu.map(wert => ({ store: 'uebungen', wert: { ...wert } })),
+      ...tage.map(wert => ({ store: 'tage', wert })),
+      { store: 'einstellungen', wert: { key: 'planVersion', wert: PLAN_VERSION } },
+    ]);
+    for (const u of neu) S.uebungen[u.id] = { ...u };
+    for (const t of tage) S.tage[t.id] = t;
+    S.einst.planVersion = PLAN_VERSION;
+    try { sessionStorage.setItem('gym-neuer-plan', 'v3'); } catch { /* egal */ }
+    return;
+  }
   await db.vieleSpeichern([
     ...STANDARD_UEBUNGEN.map(neu => ({ store: 'uebungen', wert: { ...neu } })),
     ...STANDARD_TAGE.map(wert => ({ store: 'tage', wert })),
@@ -39,7 +56,7 @@ async function planUmstellen() {
   for (const t of STANDARD_TAGE) S.tage[t.id] = t;
   S.einst.planVersion = PLAN_VERSION;
   S.einst.tagWahl = null;
-  sessionStorage.setItem('gym-neuer-plan', '1');
+  try { sessionStorage.setItem('gym-neuer-plan', '1'); } catch { /* egal */ }
 }
 
 async function sicher(fn) {

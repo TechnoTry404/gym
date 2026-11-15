@@ -14,7 +14,7 @@ export const BAND_FARBEN = {
 };
 
 // Version des Standardplans. Höher als auf dem iPhone gespeichert → Plan wird beim Öffnen umgestellt.
-export const PLAN_VERSION = 2;
+export const PLAN_VERSION = 3;
 
 // Gym-Plan (ab 15.11.2026): Mo / Mi / Fr, ca. 60 Min.
 export const STANDARD_UEBUNGEN = [
@@ -37,6 +37,9 @@ export const STANDARD_UEBUNGEN = [
   { id: 'schraegbank_maschine', name: 'Schrägbank-Maschine (oder Dips)', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 30, schritt: 5 },
   { id: 'rudern', name: 'Einarmiges Kurzhantelrudern', art: 'hantel', saetze: 3, min: 8, max: 12, proSeite: 'pro Arm', startKg: 12, schritt: 2, maxKg: null },
   { id: 'fliegende_kabel', name: 'Fliegende am Kabel (unten → oben)', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 7.5, schritt: 2.5 },
+  // Ab Plan-Version 3 (15.11.2026) am Freitag statt Kurzhantelrudern und Fliegenden:
+  { id: 'rudermaschine', name: 'Rudermaschine (brustgestützt)', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 35, schritt: 5 },
+  { id: 'butterfly', name: 'Butterfly-Maschine', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 30, schritt: 5 },
   { id: 'hammercurls', name: 'Hammercurls', art: 'hantel', saetze: 3, min: 10, max: 15, startKg: 10, schritt: 2, maxKg: null },
   { id: 'trizeps_kopf_kabel', name: 'Trizeps über Kopf am Kabel', art: 'maschine', saetze: 3, min: 10, max: 15, startKg: 15, schritt: 2.5 },
   // Am Ende jedes Trainings
@@ -59,13 +62,16 @@ export const HEIM_UEBUNGEN = [
   { id: 'trizeps', name: 'Trizeps über Kopf', art: 'hantel', saetze: 2, min: 10, max: 15, startKg: 10, schritt: 2.5, maxKg: 15 },
 ];
 
+// Austausch beim Umstieg auf Plan-Version 3 (nur Tag C, andere Änderungen bleiben).
+export const TAUSCH_V3 = { schraegbank_maschine: 'brustpresse', rudern: 'rudermaschine', fliegende_kabel: 'butterfly' };
+
 export const STANDARD_TAGE = [
   { id: 'A', name: 'Brust und Rücken', wochentag: 1,
     paare: [['schraegbank_kh'], ['klimmzug_maschine'], ['brustpresse'], ['kabelrudern'], ['seitheben_kabel'], ['beinpresse'], ['laufband']] },
   { id: 'B', name: 'Schultern und Arme', wochentag: 3,
     paare: [['schulterpresse'], ['latzug'], ['seitheben_kabel'], ['facepull_kabel'], ['curls_kabel', 'trizeps_kabel'], ['beinbeuger'], ['laufband']] },
   { id: 'C', name: 'Brust, Rücken, Arme', wochentag: 5,
-    paare: [['klimmzug_neutral'], ['schraegbank_maschine'], ['rudern'], ['fliegende_kabel'], ['seitheben_kabel'], ['hammercurls', 'trizeps_kopf_kabel'], ['laufband']] },
+    paare: [['klimmzug_neutral'], ['brustpresse'], ['rudermaschine'], ['butterfly'], ['seitheben_kabel'], ['hammercurls', 'trizeps_kopf_kabel'], ['laufband']] },
 ];
 
 export const STANDARD_EINSTELLUNGEN = {
@@ -109,6 +115,8 @@ export const RANG_STANDARDS = {
   beinbeuger: [0.35, 0.55, 0.85, 1.2, 1.6],
   rudern: [0.2, 0.35, 0.55, 0.8, 1.1],
   fliegende_kabel: [0.1, 0.2, 0.35, 0.55, 0.8],
+  rudermaschine: [0.4, 0.65, 0.95, 1.3, 1.7],
+  butterfly: [0.3, 0.5, 0.8, 1.15, 1.5],
   hammercurls: [0.1, 0.2, 0.32, 0.48, 0.65],
   trizeps_kopf_kabel: [0.15, 0.3, 0.5, 0.75, 1.05],
   klimmzug_maschine: [0.5, 0.8, 1.1, 1.35, 1.6],

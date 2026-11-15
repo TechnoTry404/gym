@@ -62,9 +62,11 @@ async function start() {
 
   zeige('heute');
   try {
-    if (sessionStorage.getItem('gym-neuer-plan')) {
+    const neu = sessionStorage.getItem('gym-neuer-plan');
+    if (neu) {
       sessionStorage.removeItem('gym-neuer-plan');
-      setTimeout(() => toast('🏋️ Neuer Gym-Plan aktiv: Mo A · Mi B · Fr C', 4000), 900);
+      const text = neu === 'v3' ? '🏋️ Freitag neu: Brustpresse, Rudermaschine, Butterfly' : '🏋️ Neuer Gym-Plan aktiv: Mo A · Mi B · Fr C';
+      setTimeout(() => toast(text, 4000), 900);
     }
   } catch { /* egal */ }
   dauerhaftAnfragen();
