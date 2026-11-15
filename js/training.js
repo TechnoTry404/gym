@@ -178,8 +178,9 @@ export function wochenStand() {
 
 // ---------- Erinnerungen ----------
 export const MESS_ARTEN = {
-  gewicht: { titel: 'Körpergewicht', icon: '⚖️', einheit: 'kg', tage: 7, schritt: 0.1, text: 'Gewicht eintragen', info: 'Am besten morgens, nach dem Toilettengang, vor dem Frühstück.' },
-  bauch: { titel: 'Bauchumfang', icon: '📏', einheit: 'cm', tage: 28, schritt: 0.5, text: 'Bauchumfang messen', info: 'Auf Höhe des Bauchnabels, entspannt ausatmen.' },
+  // Gewicht: jeden Montag (bleibt sichtbar, bis du dich in dieser Woche gewogen hast).
+  gewicht: { titel: 'Körpergewicht', icon: '⚖️', einheit: 'kg', montags: true, schritt: 0.1, text: 'Montag: Zeit zum Wiegen', info: 'Am besten morgens, nach dem Toilettengang, vor dem Frühstück.' },
+  // Bauchumfang auf Wunsch entfernt (2026-11-15); alte Werte bleiben in der Datenbank.
   klimmzugMax: { titel: 'Maxtest freie Klimmzüge', icon: '🏆', einheit: 'Wdh.', tage: 14, schritt: 1, text: 'Maxtest: freie Klimmzüge', info: 'Nach dem Aufwärmen: so viele saubere Klimmzüge wie möglich, ohne Band.' },
 };
 
@@ -194,6 +195,10 @@ export function faelligeErinnerungen() {
   for (const [art, info] of Object.entries(MESS_ARTEN)) {
     if (aus[art] === d) continue;
     const l = letzteMessung(art);
+    if (info.montags) {
+      if (!l || l.datum < wochenStart(d)) out.push({ art, text: `${info.icon} ${info.text}` });
+      continue;
+    }
     if (!l) out.push({ art, text: info.icon + ' ' + info.text });
     else {
       const t = tageZwischen(l.datum, d);

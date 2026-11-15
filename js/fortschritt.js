@@ -3,8 +3,9 @@ import { S, speichereEinheit, loescheEinheit, loescheMessung } from './store.js'
 import { einheitenSortiert, hatSaetze, MESS_ARTEN, zusammenfassung as trainingsSumme, zusammenfassungHtml } from './training.js';
 import { leistung, FREI } from './progression.js';
 import { linie, balken } from './charts.js';
-import { gesamtRang, rangChip, RAENGE, koerpergewicht as koerpergewichtRang } from './rang.js';
-import { messungEintragen, bandPunkt } from './ui.js';
+import { gesamtRang, rangChip, RAENGE, XP_GRENZEN, kraftGrenzen, koerpergewicht as koerpergewichtRang } from './rang.js';
+import { RANG_STANDARDS } from './plan.js';
+import { messungEintragen, bandPunkt, modal, schliesseModal } from './ui.js';
 import { esc, heute, addTage, fmtZahl, fmtDatumLang, fmtDatumKurz, vorTagen } from './util.js';
 
 let modus = 'kraft';          // kraft | koerper | verlauf
@@ -16,6 +17,32 @@ export function fortschrittZuruecksetzen() { unter = null; }
 export function fortschrittModus(m) { modus = m; unter = null; }
 
 // ---------- Rang ----------
+const RANG_TEXT = [
+  'Startrang – jeder fängt hier an.',
+  'Einsteiger: die ersten Monate regelmäßig trainiert.',
+  'Fortgeschritten: solide Kraft, meist nach 1–2 Jahren.',
+  'Stark: deutlich über dem Durchschnitt im Gym.',
+  'Sehr stark: jahrelanges, konsequentes Training.',
+  'Elite: die Spitze – nur sehr wenige kommen hierhin.',
+];
+function alleRaengeZeigen() {
+  const g = gesamtRang();
+  const { kg: bw } = koerpergewichtRang();
+  const latzug = kraftGrenzen(RANG_STANDARDS.latzug);
+  const zeilen = RAENGE.map((name, i) => `
+    <div class="rangzeile" style="margin:0 0 8px;${i === g.i ? 'border-color:rgba(232,121,249,.6)' : ''}">
+      <div class="n"><b>${i + 1}. ${name}${i === g.i ? ' · du bist hier' : ''}</b>
+        <span>${RANG_TEXT[i]}</span>
+        <em>Disziplin ab ${XP_GRENZEN[i].toLocaleString('de-DE')} XP · Latzug ab ${i === 0 ? '0' : fmtZahl(Math.round(latzug[i] * bw * 2) / 2)} kg (1 Wdh.)</em></div>
+      ${rangChip(i)}</div>`).join('');
+  modal(`<h3>Alle Ränge</h3>
+    <p class="info">Von unten nach oben: Bronze → Silber → Gold → Diamant → Smaragd → Rubin. Beispielgewichte bei ${fmtZahl(bw)} kg Körpergewicht.</p>
+    ${zeilen}
+    <p class="info">Jede Übung bekommt ihren eigenen Rang, dein Gesamtrang ist der gerundete Durchschnitt. Disziplin-Punkte können ihn zusätzlich anheben.</p>
+    <button class="knopf haupt" data-a="zu">Schließen</button>`, root => {
+    root.querySelector('[data-a=zu]').addEventListener('click', schliesseModal);
+  });
+}
 function rangAnsicht() {
   const g = gesamtRang();
   const bw = koerpergewichtRang();
@@ -25,6 +52,7 @@ function rangAnsicht() {
     : `Kraft im Schnitt ${RAENGE[Math.round(g.kraftSchnitt)]} (${g.uebungen.filter(x => !x.ohneDaten).length} Übungen) · Disziplin ${RAENGE[g.disziplin.i]}`;
   let html = `
     <div class="karte" style="text-align:center">
+      <button class="mini" data-a="alle-raenge" style="position:absolute;right:12px;top:12px">ⓘ Alle Ränge</button>
       <div class="muted">Dein Rang</div>
       <div style="margin:10px 0"><span class="rang gross r${g.i}"><i></i>${RAENGE[g.i]}</span></div>
       <div class="muted">${esc(schnittText)}</div>
@@ -284,7 +312,7 @@ function koerper() {
     }
     html += `<div class="chart"><div class="t"><b>${info.icon} ${esc(info.titel)}</b>${diff}</div>
       ${linie(werte.map(m => ({ datum: m.datum, wert: m.wert })), { farbe: art === 'klimmzugMax' ? '#5eead4' : '#e879f9', leer: 'Noch kein Wert eingetragen' })}
-      <p class="muted" style="margin-top:6px">${info.tage === 7 ? 'Jede Woche' : info.tage === 14 ? 'Alle 2 Wochen' : 'Alle 4 Wochen'}</p>
+      <p class="muted" style="margin-top:6px">${info.montags ? 'Jeden Montag' : info.tage === 14 ? 'Alle 2 Wochen' : 'Alle 4 Wochen'}</p>
       <div class="liste">${werte.slice(-5).reverse().map(m => `
         <div class="zeile"><span>${esc(fmtDatumKurz(m.datum))}</span><b>${fmtZahl(m.wert)} ${info.einheit}</b>
           <span><button class="mini" data-a="mess-edit" data-id="${m.id}">Ändern</button> <button class="mini rot" data-a="mess-del" data-id="${m.id}">✕</button></span></div>`).join('')}</div>
@@ -364,6 +392,7 @@ async function klick(ev) {
   else if (a === 'zurueck') { unter = null; }
   else if (a === 'zurueck-liste') { unter = unter?.von === 'liste' ? 'liste' : null; }
   else if (a === 'einheit') { unter = { einheit: el.dataset.id }; }
+  else if (a === 'alle-raenge') { alleRaengeZeigen(); return; }
   else if (a === 'mess-neu') { messungEintragen(el.dataset.art, () => renderFortschritt(viewRef)); return; }
   else if (a === 'mess-edit') {
     const m = S.messungen.find(x => x.id === el.dataset.id);
