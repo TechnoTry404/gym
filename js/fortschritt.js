@@ -19,10 +19,15 @@ function verlaufUebung(ex) {
   for (const e of einheitenSortiert()) {
     const en = e.eintraege?.find(x => x.uebung === ex.id && x.saetze?.length);
     if (!en) continue;
-    const wert = leistung(ex, en, S.einst.baender);
+    const wert = leistung(ex, en, S.einst.baender, koerpergewicht());
     if (wert != null) out.push({ datum: e.datum, wert, eintrag: en });
   }
   return out;
+}
+
+function koerpergewicht() {
+  const g = S.messungen.filter(m => m.art === 'gewicht').sort((a, b) => (a.datum < b.datum ? -1 : 1)).pop();
+  return g?.wert || 70;
 }
 
 function vergleich(ex, zr) {
@@ -79,10 +84,15 @@ function rekorde() {
 // Bester Satz eines Trainings als Text.
 function satzText(ex, en) {
   const s = en.saetze, teile = en.ziel?.teile || [];
-  if (ex.art === 'hantel') {
+  if (ex.art === 'hantel' || ex.art === 'maschine') {
     const kg = x => (typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0);
     const b = [...s].sort((x, y) => kg(y) * (1 + y.wdh / 30) - kg(x) * (1 + x.wdh / 30))[0];
     return `${fmtZahl(kg(b))} kg × ${b.wdh}`;
+  }
+  if (ex.art === 'maschine-hilfe') {
+    const kg = x => (typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0);
+    const b = [...s].sort((x, y) => kg(x) - kg(y) || y.wdh - x.wdh)[0];
+    return kg(b) > 0 ? `${fmtZahl(kg(b))} kg Hilfe × ${b.wdh}` : `ohne Hilfe × ${b.wdh}`;
   }
   if (ex.art === 'koerper') return `${Math.max(...s.map(x => x.wdh))} Wdh.`;
   if (ex.art === 'band-widerstand') {
@@ -196,9 +206,10 @@ function detailUebung(id) {
 
   const vg = vergleich(ex, 'alle');
   let titel, punkte;
-  if (ex.art === 'hantel') {
-    titel = 'Gewicht pro Hantel (kg)';
-    punkte = v.map(p => ({ datum: p.datum, wert: Math.max(...p.eintrag.saetze.map(s => (typeof s.kg === 'number' ? s.kg : p.eintrag.ziel.teile[s.teil]?.kg ?? 0))) }));
+  if (ex.art === 'hantel' || ex.art === 'maschine' || ex.art === 'maschine-hilfe') {
+    titel = ex.art === 'hantel' ? 'Gewicht pro Hantel (kg)' : ex.art === 'maschine' ? 'Gewicht (kg)' : 'Unterstützung (kg) – weniger ist besser';
+    const best = ex.art === 'maschine-hilfe' ? Math.min : Math.max;
+    punkte = v.map(p => ({ datum: p.datum, wert: best(...p.eintrag.saetze.map(s => (typeof s.kg === 'number' ? s.kg : p.eintrag.ziel.teile[s.teil]?.kg ?? 0))) }));
   } else if (ex.art === 'band-hilfe' && ex.frei) {
     titel = 'Freie Wiederholungen (bester Satz)';
     punkte = v.map(p => ({ datum: p.datum, wert: Math.max(0, ...p.eintrag.saetze.filter(s => p.eintrag.ziel.teile[s.teil]?.typ === 'frei' || s.band === FREI).map(s => s.wdh)) }));
@@ -260,7 +271,7 @@ function detailEinheit(id) {
       const p = en.ziel.teile[s.teil] || {};
       const z = `data-u="${esc(en.uebung)}" data-i="${en.saetze.indexOf(s)}"`;
       let zweites = '';
-      if (p.typ === 'hantel') zweites = `<div class="st"><button data-a="s-kg" data-d="-1" ${z}>−</button><b>${fmtZahl(s.kg ?? p.kg)}</b><button data-a="s-kg" data-d="1" ${z}>+</button></div>`;
+      if (p.typ === 'hantel' || p.typ === 'hilfe-kg') zweites = `<div class="st"><button data-a="s-kg" data-d="-1" ${z}>−</button><b>${fmtZahl(s.kg ?? p.kg)}</b><button data-a="s-kg" data-d="1" ${z}>+</button></div>`;
       else if (p.typ === 'band') zweites = `<div class="st"><button data-a="s-band" data-d="-1" ${z}>‹</button><b>${bandPunkt(s.band ?? p.band)}</b><button data-a="s-band" data-d="1" ${z}>›</button></div>`;
       html += `<div class="satzzeile"><span class="nr">${p.typ === 'frei' ? 'frei ' : ''}Satz ${s.nr + 1}</span>
         <div class="st"><button data-a="s-wdh" data-d="-1" ${z}>−</button><b>${s.wdh}</b><button data-a="s-wdh" data-d="1" ${z}>+</button></div>

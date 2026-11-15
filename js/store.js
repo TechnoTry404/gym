@@ -1,6 +1,6 @@
 // Alle Daten im Arbeitsspeicher (schnell) + sofort in die Datenbank schreiben (kein Speichern-Knopf).
 import * as db from './db.js';
-import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN } from './plan.js';
+import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION } from './plan.js';
 import { heute, toast } from './util.js';
 
 export const S = { uebungen: {}, tage: {}, einheiten: [], messungen: [], einst: {} };
@@ -13,6 +13,7 @@ export async function ladeAlles() {
       ...STANDARD_UEBUNGEN.map(wert => ({ store: 'uebungen', wert })),
       ...STANDARD_TAGE.map(wert => ({ store: 'tage', wert })),
       { store: 'einstellungen', wert: { key: 'ersteNutzung', wert: heute() } },
+      { store: 'einstellungen', wert: { key: 'planVersion', wert: PLAN_VERSION } },
     ]);
     [u, t, e, m, s] = await Promise.all(db.SPEICHER.map(name => db.alle(name)));
   }
@@ -22,6 +23,23 @@ export async function ladeAlles() {
   S.messungen = m;
   S.einst = { ...structuredClone(STANDARD_EINSTELLUNGEN), ...Object.fromEntries(s.map(x => [x.key, x.wert])) };
   if (!S.einst.ersteNutzung) await setEinst('ersteNutzung', heute());
+  if ((S.einst.planVersion || 1) < PLAN_VERSION) await planUmstellen();
+}
+
+// Einmalige Umstellung auf einen neuen Standardplan (z. B. Heim → Gym).
+// Alte Übungen und alle Trainings bleiben erhalten (Verlauf, Kraft-Übersicht); nur die Tage werden ersetzt.
+async function planUmstellen() {
+  await db.vieleSpeichern([
+    ...STANDARD_UEBUNGEN.map(neu => ({ store: 'uebungen', wert: { ...neu } })),
+    ...STANDARD_TAGE.map(wert => ({ store: 'tage', wert })),
+    { store: 'einstellungen', wert: { key: 'planVersion', wert: PLAN_VERSION } },
+    { store: 'einstellungen', wert: { key: 'tagWahl', wert: null } },
+  ]);
+  for (const u of STANDARD_UEBUNGEN) S.uebungen[u.id] = { ...u };
+  for (const t of STANDARD_TAGE) S.tage[t.id] = t;
+  S.einst.planVersion = PLAN_VERSION;
+  S.einst.tagWahl = null;
+  sessionStorage.setItem('gym-neuer-plan', '1');
 }
 
 async function sicher(fn) {

@@ -1,7 +1,7 @@
 // Training-Logik: welcher Tag heute dran ist, Ziele, Sätze, Wochenziel, Erinnerungen.
 import { S, speichereEinheit } from './store.js';
 import { naechsterZustand, baueZiel } from './progression.js';
-import { heute, trainingsDatum, wochenStart, addTage, tageZwischen, uid } from './util.js';
+import { heute, trainingsDatum, wochenStart, addTage, tageZwischen, uid, parseDatum } from './util.js';
 
 export const hatSaetze = e => !!e?.eintraege?.some(x => x.saetze?.length);
 
@@ -52,6 +52,10 @@ export function tagHeute() {
   if (e && S.tage[e.tag]) return { einheit: e, tagId: e.tag };
   const wahl = S.einst.tagWahl;
   if (wahl?.datum === d && S.tage[wahl.tag]) return { einheit: null, tagId: wahl.tag };
+  // Fester Wochentag (z. B. Mo = Tag A)? Dann der passende Tag, sonst abwechselnd.
+  const wt = ((parseDatum(d).getDay() + 6) % 7) + 1; // 1 = Montag … 7 = Sonntag
+  const passend = ids.find(id => S.tage[id].wochentag === wt);
+  if (passend) return { einheit: null, tagId: passend };
   const alle = einheitenSortiert().filter(hatSaetze);
   const letzte = alle[alle.length - 1];
   if (!letzte) return { einheit: null, tagId: ids[0] };
@@ -111,12 +115,12 @@ export function vorschlag(eintrag, teil, nr, einheitId) {
   if (alt) {
     const altTeilIdx = alt.ziel?.teile?.findIndex(t => t.typ === p.typ);
     const altTeil = alt.ziel?.teile?.[altTeilIdx];
-    const gleich = altTeil && (p.typ !== 'hantel' || altTeil.kg === p.kg) && (p.typ !== 'band' || altTeil.band === p.band);
+    const gleich = altTeil && ((p.typ !== 'hantel' && p.typ !== 'hilfe-kg') || altTeil.kg === p.kg) && (p.typ !== 'band' || altTeil.band === p.band);
     if (gleich) altSatz = alt.saetze.find(s => s.teil === altTeilIdx && s.nr === nr) || null;
   }
   const v = { wdh: davor?.wdh ?? altSatz?.wdh ?? (p.typ === 'frei' ? p.wdh : p.min) };
   if (p.typ === 'frei') v.wdh = Math.max(v.wdh, 1);
-  if (p.typ === 'hantel') v.kg = davor?.kg ?? p.kg;
+  if (p.typ === 'hantel' || p.typ === 'hilfe-kg') v.kg = davor?.kg ?? p.kg;
   if (p.typ === 'band') v.band = davor?.band ?? p.band;
   return v;
 }
@@ -134,7 +138,8 @@ export function zusammenfassung(einheit) {
     if (p?.typ !== 'hantel') continue;
     kg += (typeof s.kg === 'number' ? s.kg : p.kg || 0) * s.wdh;
   }
-  return { minuten, kg: Math.round(kg), saetze: saetze.length, wdh: saetze.reduce((n, x) => n + x.s.wdh, 0) };
+  const kraft = saetze.filter(x => x.p?.typ !== 'ausdauer');
+  return { minuten, kg: Math.round(kg), saetze: kraft.length, wdh: kraft.reduce((n, x) => n + x.s.wdh, 0) };
 }
 
 export function zusammenfassungHtml(z) {

@@ -1,7 +1,7 @@
 // Tab „Plan“ (Übungen und Tage ändern) und Tab „Mehr“ (Pause, Bänder, Backup, Speicher).
 // Jede Änderung wird sofort gespeichert.
 import { S, setEinst, speichereUebung, loescheUebung, speichereTag } from './store.js';
-import { ARTEN } from './plan.js';
+import { ARTEN, WOCHENTAGE } from './plan.js';
 import { bandPunkt, modal, schliesseModal } from './ui.js';
 import { exportieren, importieren, letzterExportText } from './backup.js';
 import { istDauerhaft, dauerhaftAnfragen } from './db.js';
@@ -19,7 +19,9 @@ export function renderPlan(view) {
   let html = `<div class="pad"><h1>Plan</h1><p class="muted">Änderungen werden sofort gespeichert und gelten ab dem nächsten Training.</p></div>`;
   for (const tag of Object.values(S.tage).sort((a, b) => a.id.localeCompare(b.id))) {
     html += `<div class="chart"><div class="feld"><span><b>Tag ${esc(tag.id)}</b></span>
-      <input type="text" data-a="tagname" data-tag="${esc(tag.id)}" value="${esc(tag.name)}" aria-label="Name von Tag ${esc(tag.id)}"></div>`;
+      <input type="text" data-a="tagname" data-tag="${esc(tag.id)}" value="${esc(tag.name)}" aria-label="Name von Tag ${esc(tag.id)}"></div>
+      <div class="feld"><span>Wochentag<small>„—“ = einfach abwechselnd</small></span>
+      <select data-a="wochentag" data-tag="${esc(tag.id)}">${WOCHENTAGE.map((w, i) => `<option value="${i}"${(tag.wochentag || 0) === i ? ' selected' : ''}>${w}</option>`).join('')}</select></div>`;
     tag.paare.forEach((paar, i) => {
       html += `<div class="paar"><span class="nr">${i + 1}</span>
         <select data-a="paar" data-tag="${esc(tag.id)}" data-i="${i}" data-j="0">${optionen(paar[0], false)}</select>
@@ -27,7 +29,7 @@ export function renderPlan(view) {
         <button class="mini" data-a="paar-hoch" data-tag="${esc(tag.id)}" data-i="${i}" aria-label="nach oben">↑</button>
         <button class="mini rot" data-a="paar-weg" data-tag="${esc(tag.id)}" data-i="${i}" aria-label="entfernen">✕</button></div>`;
     });
-    html += `<button class="knopf" data-a="paar-neu" data-tag="${esc(tag.id)}">+ Supersatz-Paar</button></div>`;
+    html += `<button class="knopf" data-a="paar-neu" data-tag="${esc(tag.id)}">+ Übung (zweite Spalte = Supersatz)</button></div>`;
   }
   html += `<div class="titel2">ÜBUNGEN</div>`;
   html += uebs.map(u => `<button class="ex" data-a="ueb" data-u="${esc(u.id)}"><div class="n"><b>${esc(u.name)}</b><span>${esc(kurz(u))}</span></div><span class="chev">›</span></button>`).join('');
@@ -74,7 +76,17 @@ async function planKlick(e) {
 async function planAenderung(e) {
   const el = e.target;
   const tag = S.tage[el.dataset.tag];
-  if (el.dataset.a === 'tagname') {
+  if (el.dataset.a === 'wochentag') {
+    const wt = +el.value;
+    // Ein Wochentag gehört nur zu einem Trainingstag.
+    for (const anderer of Object.values(S.tage)) {
+      if (anderer.id !== tag.id && wt && anderer.wochentag === wt) { anderer.wochentag = 0; await speichereTag(anderer); }
+    }
+    tag.wochentag = wt;
+    await speichereTag(tag);
+    toast('Gespeichert');
+    renderPlan(viewRef);
+  } else if (el.dataset.a === 'tagname') {
     tag.name = el.value.trim() || tag.name;
     await speichereTag(tag);
     toast('Gespeichert');
@@ -108,11 +120,16 @@ function uebungBearbeiten(id) {
     ${zahlFeld('Wdh. von', 'min', u.min)}
     ${zahlFeld('Wdh. bis', 'max', u.max)}
     <div class="feld"><span>Zusatz<small>z. B. „pro Bein“</small></span><input type="text" data-k="proSeite" value="${esc(u.proSeite || '')}"></div>`;
-  if (u.art === 'hantel') {
-    html += zahlFeld('Start-Gewicht (kg pro Hantel)', 'startKg', u.startKg)
+  if (u.art === 'hantel' || u.art === 'maschine') {
+    html += zahlFeld(u.art === 'hantel' ? 'Start-Gewicht (kg pro Hantel)' : 'Start-Gewicht (kg)', 'startKg', u.startKg)
       + zahlFeld('Steigerung (kg)', 'schritt', u.schritt ?? 2.5)
-      + zahlFeld('Höchstgewicht (kg)', 'maxKg', u.maxKg ?? 15);
+      + `<div class="feld"><span>Höchstgewicht (kg)<small>leer = kein Limit</small></span><input type="text" inputmode="decimal" data-zahl="1" data-leer="1" data-k="maxKg" value="${u.maxKg == null ? '' : fmtZahl(u.maxKg)}"></div>`;
   }
+  if (u.art === 'maschine-hilfe') {
+    html += zahlFeld('Start-Unterstützung (kg)', 'startKg', u.startKg)
+      + zahlFeld('Weniger pro Steigerung (kg)', 'schritt', u.schritt ?? 5);
+  }
+  if (u.art === 'ausdauer') html += `<p class="info">„Wdh. von/bis“ = Minuten.</p>`;
   if (u.art === 'band-hilfe') {
     html += bandAuswahl('startBand', u.startBand)
       + `<div class="feld"><span>Freie Sätze vorweg<small>wie bei Klimmzügen</small></span><input type="checkbox" data-k="hatFrei"${u.frei ? ' checked' : ''}></div>`;
@@ -147,6 +164,12 @@ function uebungBearbeiten(id) {
         else neu.ohneBand ??= { min: neu.min, max: neu.max };
       } else if (el.dataset.zahl) {
         const roh = String(el.value).replace(',', '.').trim();
+        if (roh === '' && el.dataset.leer) {
+          neu[k] = null;
+          await speichereUebung(neu);
+          toast('Gespeichert');
+          return;
+        }
         const v = Number(roh);
         if (roh === '' || !Number.isFinite(v) || v < 0) { toast('Bitte eine gültige Zahl eingeben'); return; }
         if (k === 'schritt' && v <= 0) { toast('Steigerung muss größer als 0 sein'); return; }
@@ -157,7 +180,7 @@ function uebungBearbeiten(id) {
         neu[k] = el.value.trim();
         if (k === 'name' && !neu.name) { toast('Name darf nicht leer sein'); return; }
         if (k === 'art') {
-          if (neu.art === 'hantel') { neu.startKg ??= 5; neu.schritt ??= 2.5; neu.maxKg ??= 15; }
+          if (neu.art === 'hantel' || neu.art === 'maschine' || neu.art === 'maschine-hilfe') { neu.startKg ??= neu.art === 'maschine-hilfe' ? 30 : 5; neu.schritt ??= neu.art === 'hantel' ? 2 : 5; }
           if (neu.art === 'band-hilfe' || neu.art === 'band-widerstand') neu.startBand ??= S.einst.baender[Math.floor(S.einst.baender.length / 2)];
           if (neu.art === 'band-hilfe' && neu.frei === undefined) neu.frei = null;
           if (neu.art === 'band-hilfe' && !neu.frei) neu.ohneBand ??= { min: neu.min, max: neu.max };

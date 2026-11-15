@@ -56,6 +56,12 @@ async function start() {
   });
 
   zeige('heute');
+  try {
+    if (sessionStorage.getItem('gym-neuer-plan')) {
+      sessionStorage.removeItem('gym-neuer-plan');
+      setTimeout(() => toast('🏋️ Neuer Gym-Plan aktiv: Mo A · Mi B · Fr C', 4000), 900);
+    }
+  } catch { /* egal */ }
   dauerhaftAnfragen();
   if (einheitHeute()) timer.bildschirmWach();
   registriereServiceWorker();

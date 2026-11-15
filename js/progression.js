@@ -26,7 +26,10 @@ export function startZustand(ex) {
   switch (ex.art) {
     case 'band-hilfe':
       return { freiSaetze: ex.frei?.saetze ?? 0, freiWdh: ex.frei?.wdh ?? 0, band: ex.startBand ?? null, saetze: ex.saetze };
-    case 'hantel': return { kg: ex.startKg ?? 0 };
+    case 'hantel':
+    case 'maschine':
+    case 'maschine-hilfe': return { kg: ex.startKg ?? 0 };
+    case 'ausdauer': return {};
     case 'koerper': return { saetze: ex.saetze };
     case 'band-widerstand': return { band: ex.startBand ?? null };
     default: return {};
@@ -41,8 +44,12 @@ export function baueZiel(ex, z) {
     if (ex.frei) teile.push({ typ: 'frei', saetze: z.freiSaetze > 0 ? z.freiSaetze : ex.frei.saetze, wdh: z.freiWdh > 0 ? z.freiWdh : ex.frei.wdh });
     if (z.band) teile.push({ typ: 'band', richtung: 'hilfe', saetze: ex.saetze, min: ex.min, max: ex.max, band: z.band });
     else if (!ex.frei) teile.push({ typ: 'koerper', saetze: saetzeKoerper, min: ex.ohneBand?.min ?? ex.min, max: ex.ohneBand?.max ?? ex.max });
-  } else if (ex.art === 'hantel') {
-    teile.push({ typ: 'hantel', saetze: ex.saetze, min: ex.min, max: ex.max, kg: z.kg });
+  } else if (ex.art === 'hantel' || ex.art === 'maschine') {
+    teile.push({ typ: 'hantel', saetze: ex.saetze, min: ex.min, max: ex.max, kg: z.kg, ...(ex.art === 'maschine' ? { maschine: true } : {}) });
+  } else if (ex.art === 'maschine-hilfe') {
+    teile.push({ typ: 'hilfe-kg', saetze: ex.saetze, min: ex.min, max: ex.max, kg: z.kg });
+  } else if (ex.art === 'ausdauer') {
+    teile.push({ typ: 'ausdauer', saetze: ex.saetze, min: ex.min, max: ex.max });
   } else if (ex.art === 'koerper') {
     teile.push({ typ: 'koerper', saetze: saetzeKoerper, min: ex.min, max: ex.max });
   } else if (ex.art === 'band-widerstand') {
@@ -135,6 +142,24 @@ export function naechsterZustand(ex, eintrag, baender) {
       } else {
         z.kg = genutzt; // zuletzt genutztes Gewicht übernehmen
       }
+    } else if (p.typ === 'hilfe-kg') {
+      // Maschine mit Unterstützung: obere Wdh.-Zahl in allen Sätzen → weniger Unterstützung.
+      const kgVon = x => (typeof x.kg === 'number' ? x.kg : p.kg);
+      const zuletzt = kgVon(s[s.length - 1]);
+      const ok = s.filter(x => x.wdh >= p.max && kgVon(x) <= p.kg).length >= p.saetze;
+      if (ok) {
+        const basis = Math.min(zuletzt, p.kg);
+        const neu = Math.max(0, Math.round((basis - (ex.schritt ?? 5)) * 100) / 100);
+        if (neu < basis) {
+          z.kg = neu; gesteigert = true;
+          hinweise.push(neu > 0 ? `Weniger Unterstützung: ${zahl(neu)} kg` : 'Jetzt ohne Unterstützung');
+        } else {
+          z.kg = 0;
+          hinweise.push('Ohne Unterstützung geschafft – freie Klimmzüge probieren');
+        }
+      } else {
+        z.kg = zuletzt;
+      }
     } else if (p.typ === 'band' && p.richtung === 'widerstand') {
       // Band als Widerstand: obere Wdh.-Zahl in allen Sätzen → dickeres Band.
       const genutzt = letzteBand(s) ?? p.band;
@@ -157,14 +182,22 @@ export function naechsterZustand(ex, eintrag, baender) {
 //  Hanteln: kg × (1 + Wdh./30) des besten Satzes; Körpergewicht: beste Wdh.
 //  Klimmzug-Art: freie Wdh. × 3 + Band-Stufe (+ Bruchteil der Band-Wdh.); ohne Band zählt die höchste Stufe.
 //  Dips-Art: Stufe × 10 + Wdh.; Band als Widerstand: Stufe × 25 + Wdh.
-export function leistung(ex, eintrag, baender) {
+export function leistung(ex, eintrag, baender, koerpergewicht = 70) {
   const s = eintrag?.saetze || [];
   if (!s.length) return null;
   const teile = eintrag.ziel?.teile || [];
   const n = baender.length;
   const stufeHilfe = b => (b == null || b === FREI ? n + 1 : Math.max(0, n - baender.indexOf(b)));
 
-  if (ex.art === 'hantel') {
+  if (ex.art === 'ausdauer') return null;
+  if (ex.art === 'maschine-hilfe') {
+    // Bewegtes Gewicht = Körpergewicht minus Unterstützung.
+    return Math.max(...s.map(x => {
+      const kg = typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0;
+      return Math.max(1, koerpergewicht - kg) * (1 + x.wdh / 30);
+    }));
+  }
+  if (ex.art === 'hantel' || ex.art === 'maschine') {
     let best = 0;
     for (const x of s) {
       const kg = typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0;

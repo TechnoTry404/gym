@@ -29,6 +29,8 @@ export function zielText(ex, p) {
   if (p.typ === 'frei') return `${p.saetze} × ${p.wdh} frei`;
   if (p.typ === 'band') return `${p.saetze} × ${p.min}–${p.max} · ${p.band}`;
   if (p.typ === 'hantel') return `${p.saetze} × ${p.min}–${p.max}${seite} · ${fmtZahl(p.kg)} kg`;
+  if (p.typ === 'hilfe-kg') return `${p.saetze} × ${p.min}–${p.max} · ${p.kg > 0 ? fmtZahl(p.kg) + ' kg Unterstützung' : 'ohne Unterstützung'}`;
+  if (p.typ === 'ausdauer') return `${p.min}–${p.max} Min.`;
   return `${p.saetze} × ${p.min}–${p.max}${seite}`;
 }
 
@@ -89,7 +91,7 @@ export function renderHeute(view, sheet) {
   }
 
   ctx.paare.forEach((paar, pi) => {
-    html += `<div class="sec">SUPERSATZ ${pi + 1}</div>`;
+    html += `<div class="sec">${paar.length > 1 ? `ÜBUNG ${pi + 1} · SUPERSATZ` : `ÜBUNG ${pi + 1}`}</div>`;
     for (const { ex, eintrag } of paar) {
       eintrag.ziel.teile.forEach((teilZiel, teil) => {
         const istAktiv = aktiv && aktiv.uebung === ex.id && aktiv.teil === teil;
@@ -141,8 +143,11 @@ function renderSheet(sheet, aktiv) {
   const zielKurz = p.typ === 'frei' ? `Ziel ${p.wdh}` : `Ziel ${p.min}–${p.max}`;
 
   let zweites = '';
-  if (p.typ === 'hantel') {
-    zweites = `<div><small>kg pro Hantel</small><div class="st"><button data-a="kg-minus">−</button><b class="tippbar" data-a="kg-tippen">${fmtZahl(werte.kg ?? p.kg)}</b><button data-a="kg-plus">+</button></div></div>`;
+  if (p.typ === 'hantel' || p.typ === 'hilfe-kg') {
+    const label = p.typ === 'hilfe-kg' ? 'kg Unterstützung' : p.maschine ? 'kg' : 'kg pro Hantel';
+    zweites = `<div><small>${label}</small><div class="st"><button data-a="kg-minus">−</button><b class="tippbar" data-a="kg-tippen">${fmtZahl(werte.kg ?? p.kg)}</b><button data-a="kg-plus">+</button></div></div>`;
+  } else if (p.typ === 'ausdauer') {
+    zweites = `<div><small>Ausdauer</small><div class="st" style="justify-content:center;height:44px"><b class="klein">🏃 Minuten</b></div></div>`;
   } else if (p.typ === 'band') {
     const b = werte.band ?? p.band;
     zweites = `<div><small>Band</small><div class="st"><button data-a="band-minus" aria-label="leichteres Band">‹</button><b class="klein">${bandPunkt(b)}${esc(b)}</b><button data-a="band-plus" aria-label="schwereres Band">›</button></div></div>`;
@@ -154,12 +159,12 @@ function renderSheet(sheet, aktiv) {
   html += `
     <div class="sh-kopf"><h4>${esc(teilName(ex, eintrag, aktiv.teil))} · Satz ${aktiv.nr + 1} <span>· ${zielKurz}</span></h4>${loeschen}${extra}</div>
     <div class="inp">
-      <div><small>Wiederholungen</small><div class="st"><button data-a="wdh-minus">−</button><b class="tippbar" data-a="wdh-tippen">${werte.wdh}</b><button data-a="wdh-plus">+</button></div></div>
+      <div><small>${p.typ === 'ausdauer' ? 'Minuten' : 'Wiederholungen'}</small><div class="st"><button data-a="wdh-minus">−</button><b class="tippbar" data-a="wdh-tippen">${werte.wdh}</b><button data-a="wdh-plus">+</button></div></div>
       ${zweites}
     </div>
     ${gespeichert
       ? `<button class="ok" data-a="weiter">✓ Gespeichert – weiter</button>`
-      : `<button class="ok" data-a="speichern">✓ ${werte.wdh} Wdh. speichern</button>`}`;
+      : `<button class="ok" data-a="speichern">✓ ${werte.wdh} ${p.typ === 'ausdauer' ? 'Min.' : 'Wdh.'} speichern</button>`}`;
   sheet.innerHTML = html;
 }
 
@@ -176,7 +181,9 @@ async function aendereWert(feld, delta) {
   if (feld === 'wdh-setzen') ziel.wdh = Math.max(0, Math.min(200, delta));
   if (feld === 'kg-setzen') ziel.kg = Math.max(0, delta);
   if (feld === 'kg') {
-    const step = (S.uebungen[aktiv.uebung]?.schritt ?? 2.5) / 2;
+    const ueb = S.uebungen[aktiv.uebung];
+    // Kurzhanteln: halber Steigerungsschritt; Maschinen: ganzer Schritt (Gewichtsblock).
+    const step = (ueb?.schritt ?? 2.5) / (ueb?.art === 'hantel' ? 2 : 1);
     ziel.kg = Math.max(0, Math.round(((ziel.kg ?? p.kg) + delta * step) * 100) / 100);
   }
   if (feld === 'band') {

@@ -1,26 +1,56 @@
-// Standard-Trainingsplan (Startwerte beim allerersten Öffnen). Später in der App änderbar (Tab „Plan“).
+// Standard-Trainingsplan (Startwerte). Später in der App änderbar (Tab „Plan“).
 //
 // Arten:
 //  band-hilfe      Band hilft (Klimmzüge, Chin-ups, Dips). Optional freie Sätze vorweg.
 //  hantel          Kurzhanteln, Gewicht in kg PRO HANTEL.
+//  maschine        Maschine oder Kabel, Gewicht in kg (eingestelltes Gewicht).
+//  maschine-hilfe  Maschine mit Unterstützung (z. B. Klimmzug-Maschine): weniger kg = stärker.
 //  koerper         nur Körpergewicht.
-//  band-widerstand Band macht es schwerer (Face Pulls).
+//  band-widerstand Band macht es schwerer (Face Pulls mit Band).
+//  ausdauer        Ausdauer in Minuten (z. B. Laufband), ohne Steigerung.
 
 export const BAND_FARBEN = {
   gelb: '#facc15', rot: '#ef4444', schwarz: '#141414', lila: '#a855f7', grün: '#22c55e',
 };
 
+// Version des Standardplans. Höher als auf dem iPhone gespeichert → Plan wird beim Öffnen umgestellt.
+export const PLAN_VERSION = 2;
+
+// Gym-Plan (ab 15.11.2026): Mo / Mi / Fr, ca. 60 Min.
 export const STANDARD_UEBUNGEN = [
-  { id: 'klimmzug', name: 'Klimmzüge', art: 'band-hilfe', saetze: 3, min: 5, max: 8,
-    frei: { saetze: 3, wdh: 2 }, startBand: 'grün', bandWegAb: 5, freiSaetzeOhneBand: 4 },
-  { id: 'dips', name: 'Dips', art: 'band-hilfe', saetze: 3, min: 5, max: 8,
-    frei: null, startBand: 'schwarz', ohneBand: { min: 5, max: 10 }, maxSaetze: 4 },
+  // Montag – Brust und Rücken
+  { id: 'schraegbank_kh', name: 'Schrägbankdrücken Kurzhantel', art: 'hantel', saetze: 3, min: 8, max: 10, startKg: 12, schritt: 2, maxKg: null },
+  { id: 'klimmzug_maschine', name: 'Klimmzug-Maschine (Unterstützung)', art: 'maschine-hilfe', saetze: 3, min: 6, max: 10, startKg: 30, schritt: 5 },
+  { id: 'brustpresse', name: 'Brustpresse', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 30, schritt: 5 },
+  { id: 'kabelrudern', name: 'Kabelrudern sitzend', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 35, schritt: 5 },
+  { id: 'seitheben_kabel', name: 'Seitheben am Kabel', art: 'maschine', saetze: 4, min: 12, max: 20, startKg: 5, schritt: 2.5 },
+  { id: 'beinpresse', name: 'Beinpresse', art: 'maschine', saetze: 2, min: 8, max: 12, startKg: 60, schritt: 10 },
+  // Mittwoch – Schultern und Arme
+  { id: 'schulterpresse', name: 'Schulterpresse', art: 'maschine', saetze: 3, min: 8, max: 10, startKg: 20, schritt: 5 },
+  { id: 'latzug', name: 'Latzug', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 35, schritt: 5 },
+  { id: 'facepull_kabel', name: 'Face Pulls (Kabel)', art: 'maschine', saetze: 3, min: 12, max: 20, startKg: 15, schritt: 2.5 },
+  { id: 'curls_kabel', name: 'Curls am Kabel', art: 'maschine', saetze: 3, min: 10, max: 15, startKg: 15, schritt: 2.5 },
+  { id: 'trizeps_kabel', name: 'Trizepsdrücken am Kabel', art: 'maschine', saetze: 3, min: 10, max: 15, startKg: 15, schritt: 2.5 },
+  { id: 'beinbeuger', name: 'Beinbeuger', art: 'maschine', saetze: 2, min: 10, max: 12, startKg: 30, schritt: 5 },
+  // Freitag – Brust, Rücken, Arme
+  { id: 'klimmzug_neutral', name: 'Klimmzug-Maschine neutraler Griff', art: 'maschine-hilfe', saetze: 3, min: 6, max: 10, startKg: 30, schritt: 5 },
+  { id: 'schraegbank_maschine', name: 'Schrägbank-Maschine (oder Dips)', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 30, schritt: 5 },
+  { id: 'rudern', name: 'Einarmiges Kurzhantelrudern', art: 'hantel', saetze: 3, min: 8, max: 12, proSeite: 'pro Arm', startKg: 12, schritt: 2, maxKg: null },
+  { id: 'fliegende_kabel', name: 'Fliegende am Kabel (unten → oben)', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 7.5, schritt: 2.5 },
+  { id: 'hammercurls', name: 'Hammercurls', art: 'hantel', saetze: 3, min: 10, max: 15, startKg: 10, schritt: 2, maxKg: null },
+  { id: 'trizeps_kopf_kabel', name: 'Trizeps über Kopf am Kabel', art: 'maschine', saetze: 3, min: 10, max: 15, startKg: 15, schritt: 2.5 },
+  // Am Ende jedes Trainings
+  { id: 'laufband', name: 'Laufband mit Steigung', art: 'ausdauer', saetze: 1, min: 10, max: 20 },
+];
+
+// Früherer Heimtrainingsplan (bis 14.11.2026) – bleibt für Verlauf und Tests erhalten.
+export const HEIM_UEBUNGEN = [
+  { id: 'klimmzug', name: 'Klimmzüge', art: 'band-hilfe', saetze: 3, min: 5, max: 8, frei: { saetze: 3, wdh: 2 }, startBand: 'grün', bandWegAb: 5, freiSaetzeOhneBand: 4 },
+  { id: 'dips', name: 'Dips', art: 'band-hilfe', saetze: 3, min: 5, max: 8, frei: null, startBand: 'schwarz', ohneBand: { min: 5, max: 10 }, maxSaetze: 4 },
   { id: 'seitheben', name: 'Seitheben', art: 'hantel', saetze: 4, min: 12, max: 20, startKg: 5, schritt: 2.5, maxKg: 15 },
-  { id: 'rudern', name: 'Einarmiges Rudern', art: 'hantel', saetze: 3, min: 8, max: 12, proSeite: 'pro Arm', startKg: 10, schritt: 2.5, maxKg: 15 },
   { id: 'bss', name: 'Bulgarian Split Squats', art: 'hantel', saetze: 3, min: 8, max: 12, proSeite: 'pro Bein', startKg: 5, schritt: 2.5, maxKg: 15 },
   { id: 'knieheben', name: 'Knieheben an der Stange', art: 'koerper', saetze: 3, min: 8, max: 15, hinweis: 'Beine gestreckt anheben' },
-  { id: 'chinup', name: 'Chin-ups', art: 'band-hilfe', saetze: 3, min: 5, max: 8,
-    frei: { saetze: 3, wdh: 2 }, startBand: 'grün', bandWegAb: 5, freiSaetzeOhneBand: 4 },
+  { id: 'chinup', name: 'Chin-ups', art: 'band-hilfe', saetze: 3, min: 5, max: 8, frei: { saetze: 3, wdh: 2 }, startBand: 'grün', bandWegAb: 5, freiSaetzeOhneBand: 4 },
   { id: 'pike', name: 'Pike-Liegestütze', art: 'koerper', saetze: 3, min: 6, max: 10, hinweis: 'Füße erhöhen' },
   { id: 'facepull', name: 'Face Pulls (Band)', art: 'band-widerstand', saetze: 3, min: 15, max: 20, startBand: 'rot' },
   { id: 'rdl', name: 'Rumänisches Kreuzheben', art: 'hantel', saetze: 3, min: 8, max: 12, startKg: 12.5, schritt: 2.5, maxKg: 15 },
@@ -30,8 +60,12 @@ export const STANDARD_UEBUNGEN = [
 ];
 
 export const STANDARD_TAGE = [
-  { id: 'A', name: 'Breite', paare: [['klimmzug', 'dips'], ['seitheben', 'rudern'], ['bss', 'knieheben']] },
-  { id: 'B', name: 'Schultern/Arme', paare: [['chinup', 'pike'], ['seitheben', 'facepull'], ['rdl', 'liegestuetz'], ['curls', 'trizeps']] },
+  { id: 'A', name: 'Brust und Rücken', wochentag: 1,
+    paare: [['schraegbank_kh'], ['klimmzug_maschine'], ['brustpresse'], ['kabelrudern'], ['seitheben_kabel'], ['beinpresse'], ['laufband']] },
+  { id: 'B', name: 'Schultern und Arme', wochentag: 3,
+    paare: [['schulterpresse'], ['latzug'], ['seitheben_kabel'], ['facepull_kabel'], ['curls_kabel', 'trizeps_kabel'], ['beinbeuger'], ['laufband']] },
+  { id: 'C', name: 'Brust, Rücken, Arme', wochentag: 5,
+    paare: [['klimmzug_neutral'], ['schraegbank_maschine'], ['rudern'], ['fliegende_kabel'], ['seitheben_kabel'], ['hammercurls', 'trizeps_kopf_kabel'], ['laufband']] },
 ];
 
 export const STANDARD_EINSTELLUNGEN = {
@@ -43,11 +77,17 @@ export const STANDARD_EINSTELLUNGEN = {
   timerEnde: null,
   tagWahl: null,
   erinnerungAus: {},
+  planVersion: 1,
 };
 
 export const ARTEN = {
-  'band-hilfe': 'Band als Hilfe (Klimmzug, Dips)',
-  'hantel': 'Hanteln (kg)',
+  'hantel': 'Kurzhanteln (kg pro Hantel)',
+  'maschine': 'Maschine / Kabel (kg)',
+  'maschine-hilfe': 'Maschine mit Unterstützung (kg)',
   'koerper': 'Körpergewicht',
+  'band-hilfe': 'Band als Hilfe (Klimmzug, Dips)',
   'band-widerstand': 'Band als Widerstand',
+  'ausdauer': 'Ausdauer (Minuten)',
 };
+
+export const WOCHENTAGE = ['—', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']; // Index 1 = Montag
