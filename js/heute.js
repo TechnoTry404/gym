@@ -7,6 +7,8 @@ import {
 import * as timer from './timer.js';
 import { bandPunkt, messungEintragen, zahlEingeben } from './ui.js';
 import { gesamtRang, xpFuer, RAENGE } from './rang.js';
+import { WOCHENTAGE } from './plan.js';
+const WOCHENTAGE_LANG = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 import { FREI } from './progression.js';
 import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast } from './util.js';
 
@@ -36,7 +38,8 @@ export function zielText(ex, p) {
 }
 
 function baueKontext() {
-  const { einheit, tagId } = tagHeute();
+  const { einheit, tagId, ruhetag, naechster, inTagen } = tagHeute();
+  if (ruhetag) return { ruhetag: true, naechster, inTagen, paare: [] };
   const tag = S.tage[tagId];
   const paare = (tag?.paare || []).map(paar => paar
     .filter(id => S.uebungen[id])
@@ -73,8 +76,46 @@ function rangKnopf() {
   return `<button class="rang r${g.i}" data-a="rang"><i></i>${RAENGE[g.i]}</button>`;
 }
 
+// Restday: kein Training geplant – Woche, Rang, Erinnerungen und das nächste Training.
+function renderRuhetag(view, sheet) {
+  const w = wochenStand();
+  const p = Math.min(100, Math.round((w.anzahl / w.ziel) * 100));
+  const n = S.tage[ctx.naechster];
+  const wann = ctx.inTagen === 1 ? 'Morgen' : `${WOCHENTAGE_LANG[n.wochentag]}`;
+  const woche = tagIds().filter(id => S.tage[id].wochentag).sort((a, b) => S.tage[a].wochentag - S.tage[b].wochentag)
+    .map(id => `<span class="mini" style="color:var(--muted)">${WOCHENTAGE[S.tage[id].wochentag]} · ${esc(id)}</span>`).join(' ');
+  let html = `
+    <div class="kopf">
+      <div class="ring" style="--p:${p}"><div>${w.anzahl}/${w.ziel}<small>Woche</small></div></div>
+      <div class="titel">
+        <h1>Restday</h1>
+        <p class="muted">${esc(fmtDatumLang(trainingsDatum()))}</p>
+        <span class="fire">🔥 ${w.serie} ${w.serie === 1 ? 'Woche' : 'Wochen'} Serie</span>${rangKnopf()}
+      </div>
+    </div>`;
+  for (const e of faelligeErinnerungen()) {
+    html += `<div class="erinnerung"><button class="txt" data-a="erinnerung" data-art="${e.art}">${esc(e.text)}</button><button class="weg" data-a="erinnerung-weg" data-art="${e.art}" aria-label="Heute ausblenden">✕</button></div>`;
+  }
+  html += `
+    <div class="karte" style="text-align:center">
+      <div style="font-size:44px">😴</div>
+      <h2 style="margin:6px 0">Heute ist Restday</h2>
+      <p class="muted">Erholung gehört zum Training – deine Muskeln wachsen in der Pause.</p>
+      <div class="balken" style="margin:14px 0 10px"><div style="width:${p}%"></div></div>
+      <p><b>Nächstes Training: ${esc(wann)}</b><br><span class="muted">Tag ${esc(n.id)} · ${esc(n.name)}</span></p>
+      <p style="margin-top:10px">${woche}</p>
+    </div>
+    <div class="pad"><p class="muted" style="margin:4px 2px 6px">Doch trainieren?</p>
+      ${tagIds().map(id => `<button class="knopf" data-a="trotzdem" data-tag="${esc(id)}">Tag ${esc(id)} · ${esc(S.tage[id].name)}</button>`).join('')}
+    </div>`;
+  view.innerHTML = html;
+  sheet.innerHTML = '';
+  verbinde(view, sheet);
+}
+
 export function renderHeute(view, sheet) {
   ctx = baueKontext();
+  if (ctx.ruhetag) { renderRuhetag(view, sheet); return; }
   if (!ctx.tag) {
     view.innerHTML = '<div class="leer">Kein Trainingstag angelegt. Lege im Tab „Plan“ einen Tag an.</div>';
     sheet.innerHTML = '';
@@ -273,6 +314,10 @@ function verbinde(view, sheet) {
       const frei = plaetze(eintrag).find(pl => pl.teil === teil && !satzVon(eintrag, teil, pl.nr));
       auswahl = frei || null;
       entwurf = null;
+      rerender();
+    } else if (a === 'trotzdem') {
+      await setEinst('tagWahl', { datum: trainingsDatum(), tag: el.dataset.tag });
+      auswahl = null; entwurf = null;
       rerender();
     } else if (a === 'rang') {
       document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'fortschritt', modus: 'rang' } }));

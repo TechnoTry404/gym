@@ -56,6 +56,13 @@ export function tagHeute() {
   const wt = ((parseDatum(d).getDay() + 6) % 7) + 1; // 1 = Montag … 7 = Sonntag
   const passend = ids.find(id => S.tage[id].wochentag === wt);
   if (passend) return { einheit: null, tagId: passend };
+  // Freier Tag (z. B. Sonntag) bei festen Trainingstagen: Restday, mit Hinweis auf das nächste Training.
+  const fest = ids.filter(id => S.tage[id].wochentag >= 1 && S.tage[id].wochentag <= 7);
+  if (fest.length) {
+    const abstand = id => (S.tage[id].wochentag - wt + 7) % 7;
+    const naechster = [...fest].sort((a, b) => abstand(a) - abstand(b))[0];
+    return { einheit: null, tagId: null, ruhetag: true, naechster, inTagen: abstand(naechster) };
+  }
   const alle = einheitenSortiert().filter(hatSaetze);
   const letzte = alle[alle.length - 1];
   if (!letzte) return { einheit: null, tagId: ids[0] };
