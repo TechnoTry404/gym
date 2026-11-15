@@ -83,12 +83,14 @@ export function disziplinXP(ohne = null) {
   let xp = 0;
   const proWoche = {};
   const bestBisher = {};
+  // Rekord- und Steigerungs-Punkte nur für Übungen aus dem aktuellen Plan.
+  const imPlan = new Set(Object.values(S.tage).flatMap(t => t.paare.flat()));
   for (const e of liste) {
     xp += 100;
     const komplett = e.eintraege.every(en => en.saetze.length >= (en.ziel?.teile || []).reduce((n, t) => n + t.saetze, 0));
     if (komplett) xp += 50;
     for (const en of e.eintraege) {
-      if (!en.saetze?.length) continue;
+      if (!en.saetze?.length || !imPlan.has(en.uebung)) continue;
       if (en.gesteigert) xp += 20;
       const ex = S.uebungen[en.uebung];
       if (!ex) continue;
