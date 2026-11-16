@@ -1,6 +1,6 @@
 // Service Worker: macht die App offline nutzbar und lädt Updates.
 // WICHTIG bei jedem Update: VERSION erhöhen (z. B. 1.0.1). Nur dann erkennt das iPhone die neue Version.
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const CACHE = 'gymapp-' + VERSION;
 
 const DATEIEN = [
@@ -14,9 +14,12 @@ const DATEIEN = [
   'js/db.js',
   'js/einstellungen.js',
   'js/fortschritt.js',
+  'js/haut.js',
+  'js/haut-ansicht.js',
   'js/heute.js',
   'js/plan.js',
   'js/progression.js',
+  'js/push.js',
   'js/rang.js',
   'js/store.js',
   'js/timer.js',
@@ -61,4 +64,101 @@ self.addEventListener('fetch', event => {
       }
     }),
   );
+});
+
+// ---------- Hautpflege: Push-Mitteilungen ----------
+// Der Push-Server schickt nur { art: 'morgen' | 'abend' | 'test' }. Den Text baut das iPhone hier selbst
+// aus den eigenen Daten (Wochenplan, Häkchen) – der Server kennt sie nicht.
+
+const H_WIRKSTOFF = { retinal: 'Retinal', bha: 'BHA', pause: 'Pause' };
+const H_PLAN = ['retinal', 'pause', 'bha', 'retinal', 'pause', 'retinal', 'pause'];
+
+// Datum wie in der App: bis 4 Uhr nachts zählt noch der Vortag.
+function hautDatum(jetzt = new Date()) {
+  const d = new Date(jetzt.getTime() - 4 * 3600 * 1000);
+  const p = n => String(n).padStart(2, '0');
+  return { datum: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, wtag: (d.getDay() + 6) % 7 };
+}
+
+// Titel und Text der Mitteilung. Reine Funktion (wird auch automatisch getestet).
+function hautText(art, plan, eintrag, wtag) {
+  const w = (eintrag && H_WIRKSTOFF[eintrag.wirkstoff] && eintrag.wirkstoff) || (Array.isArray(plan) && H_WIRKSTOFF[plan[wtag]] ? plan[wtag] : H_PLAN[wtag]);
+  if (art === 'test') return { titel: '🔔 Test', text: 'Push-Erinnerungen funktionieren.' };
+  if (art === 'morgen') {
+    const fertig = eintrag?.morgen?.reinigung && eintrag?.morgen?.lsf;
+    if (fertig) return { titel: '☀️ Morgenroutine', text: 'Schon erledigt – super!' };
+    return { titel: '☀️ Morgenroutine', text: 'Reinigung → LSF 50' + (w !== 'pause' ? ` · heute Abend: ${H_WIRKSTOFF[w]}` : '') };
+  }
+  const schritte = w === 'pause' ? ['reinigung', 'nachtcreme'] : ['reinigung', 'wirkstoff', 'nachtcreme'];
+  const fertig = schritte.every(s => eintrag?.abend?.[s]);
+  if (fertig) return { titel: '🌙 Abendroutine', text: 'Schon erledigt – super!' };
+  return {
+    titel: w === 'pause' ? '🌙 Abendroutine · Pause' : `🌙 Heute Abend: ${H_WIRKSTOFF[w]}`,
+    text: w === 'pause' ? 'Reinigungsgel → Nachtcreme (kein Wirkstoff)' : `Reinigungsgel → ${H_WIRKSTOFF[w]} → Nachtcreme`,
+  };
+}
+
+// Liest Wochenplan und heutigen Eintrag aus der App-Datenbank (nur lesen, nie ändern).
+function hautDatenLesen(datum) {
+  return new Promise(resolve => {
+    let req;
+    try { req = indexedDB.open('gymapp'); } catch { resolve({}); return; }
+    req.onupgradeneeded = () => { try { req.transaction.abort(); } catch { /* egal */ } };
+    req.onerror = () => resolve({});
+    req.onblocked = () => resolve({});
+    req.onsuccess = () => {
+      const db = req.result;
+      const namen = ['einstellungen', 'haut'].filter(n => db.objectStoreNames.contains(n));
+      if (!namen.length) { db.close(); resolve({}); return; }
+      const tx = db.transaction(namen, 'readonly');
+      const out = {};
+      if (namen.includes('einstellungen')) {
+        const r = tx.objectStore('einstellungen').get('hautPlan');
+        r.onsuccess = () => { out.plan = r.result?.wert; };
+      }
+      if (namen.includes('haut')) {
+        const r = tx.objectStore('haut').get(datum);
+        r.onsuccess = () => { out.eintrag = r.result; };
+      }
+      tx.oncomplete = () => { db.close(); resolve(out); };
+      tx.onerror = tx.onabort = () => { db.close(); resolve(out); };
+    };
+  });
+}
+
+self.addEventListener('push', event => {
+  let daten = {};
+  try { daten = event.data ? event.data.json() : {}; } catch { daten = {}; }
+  event.waitUntil((async () => {
+    const { datum, wtag } = hautDatum();
+    const art = ['morgen', 'abend', 'test'].includes(daten.art) ? daten.art : (new Date().getHours() < 14 ? 'morgen' : 'abend');
+    let t;
+    try {
+      const { plan, eintrag } = await hautDatenLesen(datum);
+      t = hautText(art, plan, eintrag, wtag);
+    } catch {
+      t = hautText(art, null, null, wtag);
+    }
+    await self.registration.showNotification(t.titel, {
+      body: t.text,
+      tag: 'haut-' + art,
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      data: { tab: 'haut' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const fenster = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of fenster) {
+      if ('focus' in c) {
+        c.postMessage({ tab: 'haut' });
+        return c.focus();
+      }
+    }
+    return self.clients.openWindow('./?tab=haut');
+  })());
 });

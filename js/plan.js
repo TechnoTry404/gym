@@ -1,4 +1,5 @@
 // Standard-Trainingsplan (Startwerte). Später in der App änderbar (Tab „Plan“).
+import { STANDARD_HAUT_PLAN, STANDARD_HAUT_ZEITEN, STANDARD_HAUT_PRODUKTE } from './haut.js';
 //
 // Arten:
 //  band-hilfe      Band hilft (Klimmzüge, Chin-ups, Dips). Optional freie Sätze vorweg.
@@ -84,6 +85,11 @@ export const STANDARD_EINSTELLUNGEN = {
   tagWahl: null,
   erinnerungAus: {},
   planVersion: 1,
+  // Hautpflege
+  hautPlan: [...STANDARD_HAUT_PLAN],
+  hautZeiten: { ...STANDARD_HAUT_ZEITEN },
+  hautProdukte: STANDARD_HAUT_PRODUKTE.map(p => ({ ...p })),
+  hautPush: { an: false },
 };
 
 export const ARTEN = {

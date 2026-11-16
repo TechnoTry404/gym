@@ -231,3 +231,46 @@ body.blink::after { content: ""; position: fixed; inset: 0; z-index: 100; pointe
 /* Hinweis-Meldung */
 #toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 12px); transform: translate(-50%, -150%); z-index: 200; background: #2c2346; border: 1px solid rgba(232,121,249,.5); color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 14px; transition: transform .25s; max-width: 90vw; text-align: center; }
 #toast.zeigen { transform: translate(-50%, 0); }
+
+/* ---------- Hautpflege ---------- */
+.haut-kopf { position: relative; margin-bottom: 4px; }
+.zahn { position: absolute; right: 16px; top: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--knopf); font-size: 19px; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.woche { display: flex; gap: 5px; margin: 12px 16px 8px; }
+.woche > div { flex: 1; min-width: 0; border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 7px 0 6px; text-align: center; font-size: 11px; color: var(--muted); }
+.woche > div b { display: block; font-size: 13px; color: #fff; margin-bottom: 4px; }
+.woche > div i { display: block; width: 10px; height: 10px; border-radius: 50%; margin: 0 auto 4px; }
+.woche > div.heute { border-color: var(--pink); background: rgba(232,121,249,.1); }
+.p-retinal { background: var(--pink); } .p-bha { background: var(--teal); } .p-pause { background: #4a3d6e; }
+.legende { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 0 16px 8px; }
+.legende i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+.haut-sec { display: flex; justify-content: space-between; }
+.haut-sec small { color: var(--muted); font-weight: 400; letter-spacing: 0; }
+.haut-row { padding: 10px 16px; gap: 12px; }
+.haut-row .n span { display: block; }
+.chk { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--circle); flex: none; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
+.haut-row.an .chk { background: var(--grad); border-color: transparent; }
+.haut-row.an .chk::after { content: "✓"; }
+.jn { display: flex; gap: 6px; flex: none; }
+.jn button { padding: 8px 14px; border-radius: 10px; background: var(--knopf); font-size: 14px; color: var(--muted); border: 1px solid transparent; }
+.jn button.on { border-color: rgba(232,121,249,.7); color: #fff; }
+.kal { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 8px; }
+.kal i { aspect-ratio: 1; border-radius: 4px; background: var(--knopf); }
+.kal i.k-voll, .kal-voll { background: var(--grad); }
+.kal i.k-halb, .kal-halb { background: rgba(232,121,249,.35); }
+.kal-leer { background: var(--knopf); }
+.legende i.kal-voll, .legende i.kal-halb, .legende i.kal-leer { border-radius: 2px; }
+.kal i.heute { outline: 2px solid rgba(255,255,255,.7); outline-offset: 1px; }
+.hinweis-karte { display: block; width: calc(100% - 32px); margin: 0 16px 8px; text-align: left; font-size: 13px; line-height: 1.45; color: var(--muted); background: var(--card); border: 1px dashed rgba(232,121,249,.4); border-radius: 14px; padding: 10px 12px; }
+.haut-karte { background: linear-gradient(135deg, rgba(232,121,249,.22), rgba(139,92,246,.18)); border-color: rgba(232,121,249,.45); }
+.haut-karte small { display: block; font-size: 11px; color: var(--muted); letter-spacing: .08em; font-weight: 700; }
+.haut-karte b { display: block; font-size: 24px; margin: 2px 0; }
+.haut-karte .muted { display: block; }
+.haut-karte .haut-stand { display: block; font-size: 13px; margin-top: 6px; }
+.produkt { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.produkt:last-child { border-bottom: 0; }
+.produkt input[type=text] { width: 100%; background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 16px; font-weight: 600; }
+.produkt-datum { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+.produkt-datum > span { flex: 1; min-width: 0; }
+.produkt-datum small { display: block; font-size: 12px; }
+.produkt-datum input[type=date] { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: 15px; min-width: 0; max-width: 150px; }
+#tabs button { font-size: 10px; }

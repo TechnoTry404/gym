@@ -1,12 +1,13 @@
 // Alle Daten im Arbeitsspeicher (schnell) + sofort in die Datenbank schreiben (kein Speichern-Knopf).
 import * as db from './db.js';
 import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION, TAUSCH_V3 } from './plan.js';
+import { produkteErgaenzen, STANDARD_HAUT_ZEITEN } from './haut.js';
 import { heute, toast } from './util.js';
 
-export const S = { uebungen: {}, tage: {}, einheiten: [], messungen: [], einst: {} };
+export const S = { uebungen: {}, tage: {}, einheiten: [], messungen: [], einst: {}, haut: {} };
 
 export async function ladeAlles() {
-  let [u, t, e, m, s] = await Promise.all(db.SPEICHER.map(name => db.alle(name)));
+  let [u, t, e, m, s, h] = await Promise.all(db.SPEICHER.map(name => db.alle(name)));
   if (!u.length && !t.length) {
     // Allererster Start: Standardplan anlegen.
     await db.vieleSpeichern([
@@ -15,13 +16,16 @@ export async function ladeAlles() {
       { store: 'einstellungen', wert: { key: 'ersteNutzung', wert: heute() } },
       { store: 'einstellungen', wert: { key: 'planVersion', wert: PLAN_VERSION } },
     ]);
-    [u, t, e, m, s] = await Promise.all(db.SPEICHER.map(name => db.alle(name)));
+    [u, t, e, m, s, h] = await Promise.all(db.SPEICHER.map(name => db.alle(name)));
   }
+  S.haut = Object.fromEntries((h || []).filter(x => x && x.datum).map(x => [x.datum, x]));
   S.uebungen = Object.fromEntries(u.map(x => [x.id, x]));
   S.tage = Object.fromEntries(t.map(x => [x.id, x]));
   S.einheiten = e;
   S.messungen = m;
   S.einst = { ...structuredClone(STANDARD_EINSTELLUNGEN), ...Object.fromEntries(s.map(x => [x.key, x.wert])) };
+  S.einst.hautProdukte = produkteErgaenzen(S.einst.hautProdukte);
+  S.einst.hautZeiten = { ...STANDARD_HAUT_ZEITEN, ...(S.einst.hautZeiten || {}) };
   if (!S.einst.ersteNutzung) await setEinst('ersteNutzung', heute());
   if ((S.einst.planVersion || 1) < PLAN_VERSION) await planUmstellen();
 }
@@ -89,6 +93,12 @@ export function loescheMessung(id) {
   return sicher(() => db.loeschen('messungen', id));
 }
 
+// Hautpflege: ein Eintrag pro Tag { datum, morgen, abend, wirkstoff, gereizt }
+export function speichereHaut(eintrag) {
+  S.haut[eintrag.datum] = eintrag;
+  return sicher(() => db.speichern('haut', eintrag));
+}
+
 export function speichereUebung(u) {
   S.uebungen[u.id] = u;
   return sicher(() => db.speichern('uebungen', u));
@@ -103,7 +113,8 @@ export function speichereTag(t) {
 }
 
 // ---------- Backup ----------
-export const BACKUP_SCHEMA = 1;
+// Schema 2 = mit Hautpflege. Backups mit Schema 1 lassen sich weiter laden.
+export const BACKUP_SCHEMA = 2;
 
 export function exportObjekt() {
   return {
@@ -116,6 +127,7 @@ export function exportObjekt() {
       einheiten: S.einheiten,
       messungen: S.messungen,
       einstellungen: Object.entries(S.einst).map(([key, wert]) => ({ key, wert })),
+      haut: Object.values(S.haut),
     },
   };
 }
@@ -127,7 +139,11 @@ export function pruefeBackup(obj) {
   if (typeof obj.schema !== 'number' || obj.schema > BACKUP_SCHEMA) return 'Backup stammt aus einer neueren App-Version.';
   const d = obj.daten;
   if (!d) return 'Backup ist leer.';
-  for (const k of db.SPEICHER) if (!Array.isArray(d[k])) return `Backup unvollständig (${k} fehlt).`;
+  for (const k of db.SPEICHER) {
+    if (k === 'haut' && d.haut === undefined) continue; // altes Backup ohne Hautpflege
+    if (!Array.isArray(d[k])) return `Backup unvollständig (${k} fehlt).`;
+  }
+  if (d.haut !== undefined && !d.haut.every(x => x && typeof x.datum === 'string')) return 'Hautpflege im Backup ist beschädigt.';
   if (!d.uebungen.every(x => x && x.id)) return 'Übungen im Backup sind beschädigt.';
   if (!d.tage.every(x => x && x.id && Array.isArray(x.paare))) return 'Trainingstage im Backup sind beschädigt.';
   if (!d.einheiten.every(x => x && x.id && x.datum && Array.isArray(x.eintraege))) return 'Trainings im Backup sind beschädigt.';
@@ -139,6 +155,13 @@ export function pruefeBackup(obj) {
 export async function importiere(obj) {
   const fehler = pruefeBackup(obj);
   if (fehler) throw new Error(fehler);
-  await db.allesErsetzen(obj.daten);
+  let daten = obj.daten;
+  if (daten.haut === undefined) {
+    // Altes Backup ohne Hautpflege: Hautdaten und Haut-Einstellungen (Plan, Zeiten, Produkte, Push) behalten.
+    const keys = new Set(daten.einstellungen.map(x => x.key));
+    const hautEinst = Object.entries(S.einst).filter(([k]) => k.startsWith('haut') && !keys.has(k)).map(([key, wert]) => ({ key, wert }));
+    daten = { ...daten, einstellungen: [...daten.einstellungen, ...hautEinst] };
+  }
+  await db.allesErsetzen(daten);
   await ladeAlles();
 }

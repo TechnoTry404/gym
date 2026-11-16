@@ -8,6 +8,7 @@ import * as timer from './timer.js';
 import { bandPunkt, messungEintragen, zahlEingeben } from './ui.js';
 import { gesamtRang, xpFuer, RAENGE } from './rang.js';
 import { WOCHENTAGE } from './plan.js';
+import { hautKarteHtml, hautErinnerungen } from './haut-ansicht.js';
 const WOCHENTAGE_LANG = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 import { FREI } from './progression.js';
 import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast } from './util.js';
@@ -93,9 +94,10 @@ function renderRuhetag(view, sheet) {
         <span class="fire">🔥 ${w.serie} ${w.serie === 1 ? 'Woche' : 'Wochen'} Serie</span>${rangKnopf()}
       </div>
     </div>`;
-  for (const e of faelligeErinnerungen()) {
+  for (const e of [...faelligeErinnerungen(), ...hautErinnerungen()]) {
     html += `<div class="erinnerung"><button class="txt" data-a="erinnerung" data-art="${e.art}">${esc(e.text)}</button><button class="weg" data-a="erinnerung-weg" data-art="${e.art}" aria-label="Heute ausblenden">✕</button></div>`;
   }
+  html += hautKarteHtml();
   html += `
     <div class="karte" style="text-align:center">
       <div style="font-size:44px">😴</div>
@@ -127,7 +129,7 @@ export function renderHeute(view, sheet) {
   const w = wochenStand();
   const p = Math.min(100, Math.round((w.anzahl / w.ziel) * 100));
   const darfWechseln = !ctx.einheit && tagIds().length > 1;
-  const erinnerungen = faelligeErinnerungen();
+  const erinnerungen = [...faelligeErinnerungen(), ...hautErinnerungen()];
 
   let html = `
     <div class="kopf">
@@ -142,6 +144,8 @@ export function renderHeute(view, sheet) {
   for (const e of erinnerungen) {
     html += `<div class="erinnerung"><button class="txt" data-a="erinnerung" data-art="${e.art}">${esc(e.text)}</button><button class="weg" data-a="erinnerung-weg" data-art="${e.art}" aria-label="Heute ausblenden">✕</button></div>`;
   }
+
+  html += hautKarteHtml();
 
   ctx.paare.forEach((paar, pi) => {
     html += `<div class="sec">${paar.length > 1 ? `ÜBUNG ${pi + 1} · SUPERSATZ` : `ÜBUNG ${pi + 1}`}</div>`;
@@ -327,9 +331,12 @@ function verbinde(view, sheet) {
       await setEinst('tagWahl', { datum: trainingsDatum(), tag: ids[(i + 1) % ids.length] });
       auswahl = null; entwurf = null;
       rerender();
+    } else if (a === 'haut') {
+      document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'haut' } }));
     } else if (a === 'erinnerung') {
       const art = el.dataset.art;
       if (art === 'backup') exportFn?.();
+      else if (art === 'retinal') document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'haut', modus: 'einst' } }));
       else messungEintragen(art, rerender);
     } else if (a === 'erinnerung-weg') {
       await setEinst('erinnerungAus', { ...(S.einst.erinnerungAus || {}), [el.dataset.art]: heute() });

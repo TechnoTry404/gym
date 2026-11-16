@@ -227,6 +227,11 @@ export async function renderMehr(view) {
         <button class="mini" data-a="band-runter" data-i="${i}" ${i === b.length - 1 ? 'disabled style="opacity:.3"' : ''} aria-label="schwerer">↓</button></div>`).join('')}
       <p class="info">Oben = dünnstes Band (wenig Hilfe), unten = dickstes Band (viel Hilfe).</p>
     </div>
+    <div class="titel2">HAUTPFLEGE</div>
+    <div class="chart">
+      <p class="info">Wochenplan, Erinnerungs-Zeiten (Push) und Öffnungsdaten der Produkte.</p>
+      <button class="knopf" data-a="haut-einst">🧴 Haut-Einstellungen</button>
+    </div>
     <div class="titel2">BACKUP</div>
     <div class="chart">
       <p class="info">Deine Daten liegen nur auf diesem iPhone. Letztes Backup: <b>${esc(letzterExportText())}</b>. Die App erinnert dich alle 4 Wochen.</p>
@@ -265,6 +270,7 @@ async function mehrKlick(e) {
     await setEinst('baender', b);
   } else if (a === 'export') await exportieren();
   else if (a === 'import') { importieren(() => location.reload()); return; }
+  else if (a === 'haut-einst') { document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'haut', modus: 'einst' } })); return; }
   else if (a === 'persist') {
     const ok = await dauerhaftAnfragen();
     toast(ok ? '✅ Speicher ist jetzt dauerhaft' : 'iPhone hat abgelehnt – App über das Home-Bildschirm-Icon öffnen und regelmäßig Backups machen', 4000);

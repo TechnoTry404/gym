@@ -3,6 +3,8 @@ import { ladeAlles, S } from './store.js';
 import { dauerhaftAnfragen } from './db.js';
 import { renderHeute, heuteInit, heuteTick } from './heute.js';
 import { renderFortschritt, fortschrittZuruecksetzen, fortschrittModus } from './fortschritt.js';
+import { renderHaut, hautModus } from './haut-ansicht.js';
+import { pushPruefen } from './push.js';
 import { renderPlan, renderMehr } from './einstellungen.js';
 import { exportieren } from './backup.js';
 import * as timer from './timer.js';
@@ -14,6 +16,7 @@ let tab = 'heute';
 function zeige(neu) {
   if (neu) {
     if (neu === 'fortschritt' && tab === 'fortschritt') fortschrittZuruecksetzen();
+    if (neu === 'haut' && tab !== 'haut') hautModus('liste');
     tab = neu;
   }
   const view = $('#view');
@@ -24,6 +27,7 @@ function zeige(neu) {
   sheet.innerHTML = '';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   if (tab === 'heute') renderHeute(view, sheet);
+  else if (tab === 'haut') renderHaut(view);
   else if (tab === 'fortschritt') renderFortschritt(view);
   else if (tab === 'plan') renderPlan(view);
   else if (tab === 'mehr') renderMehr(view);
@@ -49,18 +53,33 @@ async function start() {
   document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { zeige(b.dataset.tab); window.scrollTo(0, 0); }));
   new ResizeObserver(sheetHoehe).observe($('#sheet'));
   document.addEventListener('gym-tab', e => {
-    if (e.detail?.modus) fortschrittModus(e.detail.modus);
     zeige(e.detail.tab);
+    if (e.detail?.modus) {
+      if (e.detail.tab === 'haut') hautModus(e.detail.modus); else fortschrittModus(e.detail.modus);
+      zeige();
+    }
     window.scrollTo(0, 0);
   });
 
   // Mitternacht oder App lange im Hintergrund: Heute-Bildschirm auffrischen.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && tab === 'heute') zeige();
+    if (document.visibilityState === 'visible' && (tab === 'heute' || tab === 'haut')) zeige();
     if (document.visibilityState === 'visible' && (einheitHeute() || timer.laeuft())) timer.bildschirmWach();
   });
 
-  zeige('heute');
+  // Tipp auf eine Haut-Mitteilung öffnet die App mit ?tab=haut (bzw. schickt eine Nachricht, wenn sie schon offen ist).
+  let startTab = 'heute';
+  try {
+    if (new URLSearchParams(location.search).get('tab') === 'haut') {
+      startTab = 'haut';
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch { /* egal */ }
+  navigator.serviceWorker?.addEventListener('message', e => {
+    if (e.data?.tab === 'haut') { zeige('haut'); window.scrollTo(0, 0); }
+  });
+  zeige(startTab);
+  pushPruefen().then(() => { if (tab === 'haut') zeige(); });
   try {
     const neu = sessionStorage.getItem('gym-neuer-plan');
     if (neu) {

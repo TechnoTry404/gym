@@ -2,8 +2,8 @@
 // Regel für Updates: Neue Versionen dürfen Speicher nur ERGÄNZEN, nie löschen → kein Datenverlust.
 
 const NAME = 'gymapp';
-const VERSION = 1;
-export const SPEICHER = ['uebungen', 'tage', 'einheiten', 'messungen', 'einstellungen'];
+const VERSION = 2;
+export const SPEICHER = ['uebungen', 'tage', 'einheiten', 'messungen', 'einstellungen', 'haut'];
 
 let dbPromise = null;
 
@@ -25,7 +25,9 @@ export function oeffnen() {
         s.createIndex('art', 'art');
       }
       if (!db.objectStoreNames.contains('einstellungen')) db.createObjectStore('einstellungen', { keyPath: 'key' });
-      // Spätere Versionen: hier mit "if (event.oldVersion < 2) { … }" ergänzen.
+      // Version 2: Hautpflege, ein Eintrag pro Tag (nur ergänzen, nichts löschen).
+      if (!db.objectStoreNames.contains('haut')) db.createObjectStore('haut', { keyPath: 'datum' });
+      // Spätere Versionen: hier ebenso nur neue Speicher ergänzen.
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -85,6 +87,8 @@ export async function allesErsetzen(daten) {
   const db = await oeffnen();
   const tx = db.transaction(SPEICHER, 'readwrite');
   for (const s of SPEICHER) {
+    // Alte Backups (vor der Hautpflege) haben keine Hautdaten: dann bleiben die vorhandenen erhalten.
+    if (s === 'haut' && !Array.isArray(daten.haut)) continue;
     const os = tx.objectStore(s);
     os.clear();
     for (const wert of daten[s] || []) os.put(wert);
