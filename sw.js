@@ -1,6 +1,6 @@
 // Service Worker: macht die App offline nutzbar und lädt Updates.
 // WICHTIG bei jedem Update: VERSION erhöhen (z. B. 1.0.1). Nur dann erkennt das iPhone die neue Version.
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 const CACHE = 'gymapp-' + VERSION;
 
 const DATEIEN = [
@@ -98,7 +98,19 @@ function hautText(art, plan, eintrag, wtag) {
   };
 }
 
-// Liest Wochenplan und heutigen Eintrag aus der App-Datenbank (nur lesen, nie ändern).
+// Wiegen: montags mit der Morgen-Mitteilung, solange in dieser Woche noch nicht gewogen wurde
+// (wie die Erinnerung in der App). gewichtDaten = Liste der Datumswerte 'JJJJ-MM-TT'.
+function kalenderTag(jetzt = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return { datum: `${jetzt.getFullYear()}-${p(jetzt.getMonth() + 1)}-${p(jetzt.getDate())}`, wtag: (jetzt.getDay() + 6) % 7 };
+}
+function wiegenFaellig(gewichtDaten, jetzt = new Date()) {
+  const { datum, wtag } = kalenderTag(jetzt);
+  if (wtag !== 0) return false; // nur montags
+  return !(gewichtDaten || []).some(d => String(d).slice(0, 10) >= datum);
+}
+
+// Liest Wochenplan, heutigen Eintrag und die Gewichts-Daten aus der App-Datenbank (nur lesen, nie ändern).
 function hautDatenLesen(datum) {
   return new Promise(resolve => {
     let req;
@@ -108,7 +120,7 @@ function hautDatenLesen(datum) {
     req.onblocked = () => resolve({});
     req.onsuccess = () => {
       const db = req.result;
-      const namen = ['einstellungen', 'haut'].filter(n => db.objectStoreNames.contains(n));
+      const namen = ['einstellungen', 'haut', 'messungen'].filter(n => db.objectStoreNames.contains(n));
       if (!namen.length) { db.close(); resolve({}); return; }
       const tx = db.transaction(namen, 'readonly');
       const out = {};
@@ -119,6 +131,10 @@ function hautDatenLesen(datum) {
       if (namen.includes('haut')) {
         const r = tx.objectStore('haut').get(datum);
         r.onsuccess = () => { out.eintrag = r.result; };
+      }
+      if (namen.includes('messungen')) {
+        const r = tx.objectStore('messungen').getAll();
+        r.onsuccess = () => { out.gewicht = (r.result || []).filter(m => m && m.art === 'gewicht').map(m => m.datum); };
       }
       tx.oncomplete = () => { db.close(); resolve(out); };
       tx.onerror = tx.onabort = () => { db.close(); resolve(out); };
@@ -133,9 +149,11 @@ self.addEventListener('push', event => {
     const { datum, wtag } = hautDatum();
     const art = ['morgen', 'abend', 'test'].includes(daten.art) ? daten.art : (new Date().getHours() < 14 ? 'morgen' : 'abend');
     let t;
+    let wiegen = false;
     try {
-      const { plan, eintrag } = await hautDatenLesen(datum);
+      const { plan, eintrag, gewicht } = await hautDatenLesen(datum);
       t = hautText(art, plan, eintrag, wtag);
+      wiegen = art === 'morgen' && Array.isArray(gewicht) && wiegenFaellig(gewicht);
     } catch {
       t = hautText(art, null, null, wtag);
     }
@@ -146,19 +164,29 @@ self.addEventListener('push', event => {
       badge: 'icons/icon-192.png',
       data: { tab: 'haut' },
     });
+    if (wiegen) {
+      await self.registration.showNotification('⚖️ Zeit zum Wiegen', {
+        body: 'Am besten jetzt: nach dem Toilettengang, vor dem Frühstück. Tippen zum Eintragen.',
+        tag: 'wiegen',
+        icon: 'icons/icon-192.png',
+        badge: 'icons/icon-192.png',
+        data: { tab: 'heute', aktion: 'wiegen' },
+      });
+    }
   })());
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const wiegen = event.notification.data?.aktion === 'wiegen';
   event.waitUntil((async () => {
     const fenster = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of fenster) {
       if ('focus' in c) {
-        c.postMessage({ tab: 'haut' });
+        c.postMessage(wiegen ? { tab: 'heute', aktion: 'wiegen' } : { tab: 'haut' });
         return c.focus();
       }
     }
-    return self.clients.openWindow('./?tab=haut');
+    return self.clients.openWindow(wiegen ? './?aktion=wiegen' : './?tab=haut');
   })());
 });

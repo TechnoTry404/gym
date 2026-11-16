@@ -9,6 +9,7 @@ import { renderPlan, renderMehr } from './einstellungen.js';
 import { exportieren } from './backup.js';
 import * as timer from './timer.js';
 import { einheitHeute } from './training.js';
+import { messungEintragen } from './ui.js';
 import { $, toast } from './util.js';
 
 let tab = 'heute';
@@ -68,17 +69,25 @@ async function start() {
   });
 
   // Tipp auf eine Haut-Mitteilung öffnet die App mit ?tab=haut (bzw. schickt eine Nachricht, wenn sie schon offen ist).
+  // Tipp auf „Zeit zum Wiegen“: Heute-Tab mit der Gewichts-Eingabe öffnen.
+  const wiegenOeffnen = () => {
+    zeige('heute'); window.scrollTo(0, 0);
+    messungEintragen('gewicht', () => { if (tab === 'heute') zeige(); });
+  };
   let startTab = 'heute';
+  let startWiegen = false;
   try {
-    if (new URLSearchParams(location.search).get('tab') === 'haut') {
-      startTab = 'haut';
-      history.replaceState(null, '', location.pathname);
-    }
+    const q = new URLSearchParams(location.search);
+    if (q.get('tab') === 'haut') startTab = 'haut';
+    if (q.get('aktion') === 'wiegen') startWiegen = true;
+    if (location.search) history.replaceState(null, '', location.pathname);
   } catch { /* egal */ }
   navigator.serviceWorker?.addEventListener('message', e => {
-    if (e.data?.tab === 'haut') { zeige('haut'); window.scrollTo(0, 0); }
+    if (e.data?.aktion === 'wiegen') wiegenOeffnen();
+    else if (e.data?.tab === 'haut') { zeige('haut'); window.scrollTo(0, 0); }
   });
   zeige(startTab);
+  if (startWiegen) wiegenOeffnen();
   pushPruefen().then(() => { if (tab === 'haut') zeige(); });
   try {
     const neu = sessionStorage.getItem('gym-neuer-plan');
