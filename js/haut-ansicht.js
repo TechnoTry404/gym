@@ -19,6 +19,8 @@ const fmtMonat = s => parseDatum(s).toLocaleDateString('de-DE', { day: 'numeric'
 
 // Karte „Heute Abend: …“ für den Heute-Tab (Trainings- und Restday).
 export function hautKarteHtml() {
+  // Mit ✕ für heute ausgeblendet? (Der Haut-Tab bleibt natürlich da.)
+  if ((S.einst.erinnerungAus || {}).hautKarte === heute()) return '';
   const d = trainingsDatum();
   const e = S.haut[d];
   const w = wirkstoffFuer(e, S.einst.hautPlan, d);
@@ -27,13 +29,14 @@ export function hautKarteHtml() {
   const unter = w === 'pause' ? 'kein Wirkstoff – nur Reinigungsgel und Nachtcreme' : esc(produkt(WIRKSTOFFE[w].produkt)?.name || '');
   const stand = m.fertig && a.fertig ? '✅ Hautpflege heute komplett'
     : `☀️ Morgen ${m.fertig ? '✓' : `${m.erledigt}/${m.gesamt}`} · 🌙 Abend ${a.fertig ? '✓' : `${a.erledigt}/${a.gesamt}`}`;
-  return `<button class="karte haut-karte" data-a="haut">
+  return `<div class="karte haut-karte" data-a="haut" role="button" tabindex="0">
+      <button class="weg-x" data-a="erinnerung-weg" data-art="hautKarte" aria-label="Heute ausblenden">✕</button>
       <small>🧴 HEUTE ABEND</small>
       <b>${esc(name)}</b>
       <span class="muted">${unter}</span>
       <span class="haut-stand">${stand}</span>
       <span class="tap">Haut ›</span>
-    </button>`;
+    </div>`;
 }
 
 // Erinnerung, wenn das Retinal zu lange offen ist (für den Heute-Tab und den Haut-Tab).

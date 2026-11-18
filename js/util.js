@@ -83,3 +83,15 @@ export function haptik(muster = 30) {
     label.remove();
   } catch { /* egal */ }
 }
+
+// ---------- Pfund (lb) ----------
+// Intern rechnet die App immer in kg. Manche Maschinen zeigen lb: dann nur Anzeige und Eingabe in lb.
+export const LB = 0.45359237; // 1 lb in kg
+export const kgZuLb = kg => kg / LB;
+export const lbZuKg = lb => Math.round((lb * LB) * 1000) / 1000;
+export const rundeLb = (lb, schritt = 0.5) => Math.round(lb / schritt) * schritt;
+// Gewicht für eine Übung anzeigen: „45 lb“ bzw. „20 kg“.
+export function istLb(ueb) { return ueb?.einheit === 'lb'; }
+export function gewichtText(kg, ueb) {
+  return istLb(ueb) ? `${fmtZahl(rundeLb(kgZuLb(kg)))} lb` : `${fmtZahl(kg)} kg`;
+}

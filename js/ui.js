@@ -10,19 +10,37 @@ export function bandPunkt(band) {
 }
 
 let schliessenCb = null;
-export function modal(html, beimOeffnen, beimSchliessen) {
+let vvAus = null; // Aufräumen des Tastatur-Ausgleichs
+// oben = true: Fenster oben statt unten (für Eingaben mit Tastatur – unten würde die Tastatur es verdecken).
+export function modal(html, beimOeffnen, beimSchliessen, { oben = false } = {}) {
   schliesseModal();
   const bg = document.createElement('div');
-  bg.className = 'modal-bg';
-  bg.innerHTML = `<div class="modal" role="dialog"><div class="grip"></div>${html}</div>`;
+  bg.className = 'modal-bg' + (oben ? ' oben' : '');
+  bg.innerHTML = `<div class="modal" role="dialog">${oben ? '' : '<div class="grip"></div>'}${html}</div>`;
   bg.addEventListener('click', e => { if (e.target === bg) schliesseModal(); });
   document.body.appendChild(bg);
   schliessenCb = beimSchliessen || null;
+  if (oben && window.visualViewport) {
+    // iPhone: Wenn die Tastatur aufgeht, das Fenster im sichtbaren Bereich halten.
+    const vv = window.visualViewport;
+    const passe = () => { bg.style.top = vv.offsetTop + 'px'; bg.style.height = vv.height + 'px'; };
+    vv.addEventListener('resize', passe); vv.addEventListener('scroll', passe);
+    vvAus = () => { vv.removeEventListener('resize', passe); vv.removeEventListener('scroll', passe); };
+    passe();
+  }
   beimOeffnen?.(bg.querySelector('.modal'));
   return bg;
 }
+
+// Eingabefeld sofort fokussieren – muss direkt im Tipp passieren, sonst öffnet das iPhone die Tastatur nicht.
+function sofortFokus(inp, markieren) {
+  try { inp.focus({ preventScroll: true }); } catch { inp.focus(); }
+  if (markieren) { try { inp.select(); } catch { /* egal */ } }
+}
+
 export function schliesseModal() {
   const alt = document.querySelector('.modal-bg');
+  vvAus?.(); vvAus = null;
   if (!alt) return;
   // Offene Eingabe zuerst abschließen (speichert sofort).
   if (document.activeElement && alt.contains(document.activeElement)) document.activeElement.blur();
@@ -52,8 +70,8 @@ export function zahlEingeben({ titel, wert, einheit, ganz = false, max = 500 }, 
     };
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') uebernehmen(); });
     root.querySelector('[data-a=fertig]').addEventListener('click', uebernehmen);
-    setTimeout(() => { inp.focus(); inp.select(); }, 50);
-  });
+    sofortFokus(inp, true);
+  }, null, { oben: true });
 }
 
 // Messwert eintragen. Speichert bei jeder Eingabe automatisch (kein Speichern-Knopf).
@@ -88,6 +106,6 @@ export function messungEintragen(art, beimSchliessen, vorhandene = null) {
     root.querySelector('[data-a=fertig]').addEventListener('click', async () => {
       clearTimeout(timer); await speichern(); schliesseModal();
     });
-    setTimeout(() => inp.focus(), 50);
-  }, beimSchliessen);
+    sofortFokus(inp, false);
+  }, beimSchliessen, { oben: true });
 }

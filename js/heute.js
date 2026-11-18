@@ -1,8 +1,8 @@
 // Heute-Bildschirm: Tag A/B, Supersatz-Paare, Satz eintragen mit einem Tipp, Pausentimer.
-import { S, speichereEinheit, setEinst } from './store.js';
+import { S, speichereEinheit, setEinst, speichereUebung } from './store.js';
 import {
   tagHeute, eintragFuer, sichereEinheit, plaetze, reihenfolge, satzVon, vorschlag,
-  wochenStand, faelligeErinnerungen, tagIds, zusammenfassung, zusammenfassungHtml,
+  wochenStand, faelligeErinnerungen, tagIds, zusammenfassung, zusammenfassungHtml, istUebersprungen, hatSaetze,
 } from './training.js';
 import * as timer from './timer.js';
 import { bandPunkt, messungEintragen, zahlEingeben } from './ui.js';
@@ -11,7 +11,7 @@ import { WOCHENTAGE } from './plan.js';
 import { hautKarteHtml, hautErinnerungen } from './haut-ansicht.js';
 const WOCHENTAGE_LANG = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 import { FREI } from './progression.js';
-import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast } from './util.js';
+import { esc, heute, trainingsDatum, fmtDatumLang, fmtZahl, fmtZeit, haptik, toast, LB, kgZuLb, lbZuKg, rundeLb, istLb } from './util.js';
 
 let auswahl = null;   // gewählter Satz {uebung, teil, nr}
 let entwurf = null;   // Werte für einen neuen Satz {key, wdh, kg, band}
@@ -21,6 +21,8 @@ let exportFn = null;
 export function heuteInit({ beiExport }) { exportFn = beiExport; }
 
 const key = a => `${a.uebung}|${a.teil}|${a.nr}`;
+// Zusammenfassung „Training geschafft“ mit ✕ eingeklappt (gilt für das heutige Training).
+const fertigZu = () => !!ctx?.einheit && S.einst.fertigZu === ctx.einheit.id;
 
 function teilName(ex, eintrag, teil) {
   const p = eintrag.ziel.teile[teil];
@@ -28,12 +30,21 @@ function teilName(ex, eintrag, teil) {
   return ex.name + (p.typ === 'frei' ? ' frei' : p.typ === 'band' ? ' Band' : ' ohne Band');
 }
 
+// lb-Maschinen: Schritte von 5 lb (Kurzhanteln 2,5 lb). Zielgewicht auf so einen Schritt runden, kg klein dahinter.
+const lbSchritt = ex => (ex?.art === 'hantel' ? 2.5 : 5);
+const zielLb = (ex, kg) => rundeLb(kgZuLb(kg), lbSchritt(ex));
+function zielGewicht(ex, kg) {
+  if (!istLb(ex)) return `${fmtZahl(kg)} kg`;
+  const lb = zielLb(ex, kg);
+  return `${fmtZahl(lb)} lb (≈ ${fmtZahl(Math.round(lb * LB * 10) / 10)} kg)`;
+}
+
 export function zielText(ex, p) {
   const seite = ex.proSeite ? ' ' + ex.proSeite : '';
   if (p.typ === 'frei') return `${p.saetze} × ${p.wdh} frei`;
   if (p.typ === 'band') return `${p.saetze} × ${p.min}–${p.max} · ${p.band}`;
-  if (p.typ === 'hantel') return `${p.saetze} × ${p.min}–${p.max}${seite} · ${fmtZahl(p.kg)} kg`;
-  if (p.typ === 'hilfe-kg') return `${p.saetze} × ${p.min}–${p.max} · ${p.kg > 0 ? fmtZahl(p.kg) + ' kg Unterstützung' : 'ohne Unterstützung'}`;
+  if (p.typ === 'hantel') return `${p.saetze} × ${p.min}–${p.max}${seite} · ${zielGewicht(ex, p.kg)}`;
+  if (p.typ === 'hilfe-kg') return `${p.saetze} × ${p.min}–${p.max} · ${p.kg > 0 ? zielGewicht(ex, p.kg) + ' Unterstützung' : 'ohne Unterstützung'}`;
   if (p.typ === 'ausdauer') return `${p.min}–${p.max} Min.`;
   return `${p.saetze} × ${p.min}–${p.max}${seite}`;
 }
@@ -60,7 +71,7 @@ function naechsterPlatz() {
   for (const paar of ctx.paare) {
     for (const pl of reihenfolge(paar.map(x => x.eintrag))) {
       const { eintrag } = finde(pl.uebung);
-      if (!satzVon(eintrag, pl.teil, pl.nr)) return pl;
+      if (!satzVon(eintrag, pl.teil, pl.nr) && !istUebersprungen(eintrag, pl.teil, pl.nr)) return pl;
     }
   }
   return null;
@@ -146,6 +157,9 @@ export function renderHeute(view, sheet) {
   }
 
   html += hautKarteHtml();
+  if (!aktiv && fertigZu()) {
+    html += `<button class="fertig-zu" data-a="fertig-auf"><span>${hatSaetze(ctx.einheit) ? '💪 Training geschafft' : '⏭ Alle Sätze übersprungen'}</span><b class="up">Zusammenfassung ›</b></button>`;
+  }
 
   ctx.paare.forEach((paar, pi) => {
     html += `<div class="sec">${paar.length > 1 ? `ÜBUNG ${pi + 1} · SUPERSATZ` : `ÜBUNG ${pi + 1}`}</div>`;
@@ -157,8 +171,9 @@ export function renderHeute(view, sheet) {
         const kreise = liste.map(pl => {
           const s = satzVon(eintrag, teil, pl.nr);
           const c = aktiv && key(aktiv) === key(pl) ? ' c' : '';
-          const inhalt = s ? s.wdh : `<span class="geist">${pl.nr + 1}</span>`;
-          return `<button class="${s ? 'd' : ''}${c}" data-a="platz" data-u="${ex.id}" data-t="${teil}" data-n="${pl.nr}" aria-label="Satz ${pl.nr + 1}">${inhalt}</button>`;
+          const skip = !s && istUebersprungen(eintrag, teil, pl.nr);
+          const inhalt = s ? s.wdh : skip ? '–' : `<span class="geist">${pl.nr + 1}</span>`;
+          return `<button class="${s ? 'd' : skip ? 's' : ''}${c}" data-a="platz" data-u="${ex.id}" data-t="${teil}" data-n="${pl.nr}" aria-label="Satz ${pl.nr + 1}">${inhalt}</button>`;
         }).join('');
         const hinweis = teil === 0 && eintrag.hinweise?.length
           ? `<span class="hinweis">${eintrag.gesteigert ? '↑ ' : '✓ '}${esc(eintrag.hinweise.join(' · '))}</span>` : '';
@@ -186,24 +201,33 @@ function renderSheet(sheet, aktiv) {
     const w = wochenStand();
     const z = zusammenfassung(ctx.einheit);
     const xp = ctx.einheit ? xpFuer(ctx.einheit.id) : 0;
-    html += `<div class="fertig"><b>💪 Training geschafft! <span class="up">+${xp} XP</span></b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
+    if (fertigZu()) { sheet.innerHTML = ''; return; } // mit ✕ eingeklappt
+    html += `<div class="fertig"><button class="weg-x" data-a="fertig-zu" aria-label="Zusammenfassung ausblenden">✕</button><b>${hatSaetze(ctx.einheit) ? `💪 Training geschafft! <span class="up">+${xp} XP</span>` : '⏭ Alle Sätze übersprungen'}</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
     sheet.innerHTML = html;
     return;
   }
+  const skipHier = istUebersprungen(finde(aktiv.uebung).eintrag, aktiv.teil, aktiv.nr);
   const { ex, eintrag } = finde(aktiv.uebung);
   const p = eintrag.ziel.teile[aktiv.teil];
   const gespeichert = satzVon(eintrag, aktiv.teil, aktiv.nr);
   const k = key(aktiv);
   if (!gespeichert && (!entwurf || entwurf.key !== k)) {
     entwurf = { key: k, ...vorschlag(eintrag, aktiv.teil, aktiv.nr, ctx.einheit?.id) };
+    // lb-Maschine: Vorschlag auf ein echtes Gewicht der Maschine runden (z. B. 45 lb statt 44,1 lb).
+    if (istLb(ex) && (p.typ === 'hantel' || p.typ === 'hilfe-kg')) entwurf.kg = lbZuKg(zielLb(ex, entwurf.kg ?? p.kg));
   }
   const werte = gespeichert || entwurf;
   const zielKurz = p.typ === 'frei' ? `Ziel ${p.wdh}` : `Ziel ${p.min}–${p.max}`;
 
   let zweites = '';
   if (p.typ === 'hantel' || p.typ === 'hilfe-kg') {
-    const label = p.typ === 'hilfe-kg' ? 'kg Unterstützung' : p.maschine ? 'kg' : 'kg pro Hantel';
-    zweites = `<div><small>${label}</small><div class="st"><button data-a="kg-minus">−</button><b class="tippbar" data-a="kg-tippen">${fmtZahl(werte.kg ?? p.kg)}</b><button data-a="kg-plus">+</button></div></div>`;
+    const lb = istLb(ex);
+    const einheit = lb ? 'lb' : 'kg';
+    const label = p.typ === 'hilfe-kg' ? `${einheit} Unterstützung` : p.maschine ? einheit : `${einheit} pro Hantel`;
+    const kg = werte.kg ?? p.kg;
+    const zahl = lb ? fmtZahl(rundeLb(kgZuLb(kg))) : fmtZahl(kg);
+    const umrechnung = lb ? `<span class="kg-klein">≈ ${fmtZahl(Math.round(kg * 10) / 10)} kg</span>` : '';
+    zweites = `<div><small>${label} <button class="einheit-knopf" data-a="einheit-wechsel" aria-label="Einheit wechseln">⇄ ${lb ? 'kg' : 'lb'}</button></small><div class="st"><button data-a="kg-minus">−</button><b class="tippbar" data-a="kg-tippen">${zahl}</b><button data-a="kg-plus">+</button></div>${umrechnung}</div>`;
   } else if (p.typ === 'ausdauer') {
     zweites = `<div><small>Ausdauer</small><div class="st" style="justify-content:center;height:44px"><b class="klein">🏃 Minuten</b></div></div>`;
   } else if (p.typ === 'band') {
@@ -215,7 +239,7 @@ function renderSheet(sheet, aktiv) {
   const extra = `<button class="link" data-a="extra">+ Satz</button>`;
   const loeschen = gespeichert ? `<button class="link rot" data-a="loeschen">Löschen</button>` : '';
   html += `
-    <div class="sh-kopf"><h4>${esc(teilName(ex, eintrag, aktiv.teil))} · Satz ${aktiv.nr + 1} <span>· ${zielKurz}</span></h4>${loeschen}${extra}</div>
+    <div class="sh-kopf"><h4>${esc(teilName(ex, eintrag, aktiv.teil))} · Satz ${aktiv.nr + 1} <span>· ${skipHier ? 'übersprungen – trotzdem eintragen?' : zielKurz}</span></h4>${loeschen}${extra}</div>
     <div class="inp">
       <div><small>${p.typ === 'ausdauer' ? 'Minuten' : 'Wiederholungen'}</small><div class="st"><button data-a="wdh-minus">−</button><b class="tippbar" data-a="wdh-tippen">${werte.wdh}</b><button data-a="wdh-plus">+</button></div></div>
       ${zweites}
@@ -223,6 +247,11 @@ function renderSheet(sheet, aktiv) {
     ${gespeichert
       ? `<button class="ok" data-a="weiter">✓ Gespeichert – weiter</button>`
       : `<button class="ok" data-a="speichern">✓ ${werte.wdh} ${p.typ === 'ausdauer' ? 'Min.' : 'Wdh.'} speichern</button>`}`;
+  // Überspringen: Satz nicht gemacht → zählt nicht als 0 Wdh., das Training wird trotzdem fertig.
+  if (!skipHier) {
+    const offeneDanach = plaetze(eintrag).filter(pl => pl.teil === aktiv.teil && pl.nr > aktiv.nr && !satzVon(eintrag, pl.teil, pl.nr) && !istUebersprungen(eintrag, pl.teil, pl.nr)).length;
+    html += `<div class="sh-aktionen"><button class="link" data-a="skip">⏭ Satz überspringen</button>${!gespeichert && offeneDanach ? `<button class="link" data-a="skip-rest">Rest überspringen (${offeneDanach + 1} Sätze)</button>` : ''}</div>`;
+  }
   sheet.innerHTML = html;
 }
 
@@ -238,7 +267,12 @@ async function aendereWert(feld, delta) {
   if (feld === 'wdh') ziel.wdh = Math.max(0, Math.min(200, ziel.wdh + delta));
   if (feld === 'wdh-setzen') ziel.wdh = Math.max(0, Math.min(200, delta));
   if (feld === 'kg-setzen') ziel.kg = Math.max(0, delta);
-  if (feld === 'kg') {
+  if (feld === 'kg' && istLb(S.uebungen[aktiv.uebung])) {
+    // lb-Maschine: in lb-Schritten zählen, intern in kg speichern.
+    const ueb = S.uebungen[aktiv.uebung];
+    const lb = rundeLb(kgZuLb(ziel.kg ?? p.kg)) + delta * lbSchritt(ueb);
+    ziel.kg = lbZuKg(Math.max(0, rundeLb(lb)));
+  } else if (feld === 'kg') {
     const ueb = S.uebungen[aktiv.uebung];
     // Kurzhanteln: halber Steigerungsschritt; Maschinen: ganzer Schritt (Gewichtsblock).
     const step = (ueb?.schritt ?? 2.5) / (ueb?.art === 'hantel' ? 2 : 1);
@@ -266,6 +300,8 @@ async function speichereSatz() {
   if (entwurf.band != null) satz.band = entwurf.band;
   eintrag.saetze = eintrag.saetze.filter(s => !(s.teil === satz.teil && s.nr === satz.nr));
   eintrag.saetze.push(satz);
+  // War dieser Satz übersprungen? Dann gilt er jetzt als gemacht.
+  if (eintrag.uebersprungen) eintrag.uebersprungen = eintrag.uebersprungen.filter(s => !(s.teil === satz.teil && s.nr === satz.nr));
   await speichereEinheit(einheit);
   if (S.einst.tagWahl) setEinst('tagWahl', null);
   auswahl = null;
@@ -284,9 +320,39 @@ async function loescheSatz() {
   eintrag.saetze = eintrag.saetze
     .filter(s => !(s.teil === aktiv.teil && s.nr === aktiv.nr))
     .map(s => (s.teil === aktiv.teil && s.nr > aktiv.nr ? { ...s, nr: s.nr - 1 } : s));
+  if (eintrag.uebersprungen) {
+    eintrag.uebersprungen = eintrag.uebersprungen
+      .filter(s => !(s.teil === aktiv.teil && s.nr === aktiv.nr))
+      .map(s => (s.teil === aktiv.teil && s.nr > aktiv.nr ? { ...s, nr: s.nr - 1 } : s));
+  }
   await speichereEinheit(ctx.einheit);
   auswahl = null;
   entwurf = null;
+  rerender();
+}
+
+// Satz (oder alle restlichen Sätze dieser Übung) als „nicht gemacht“ markieren.
+// Ein schon gespeicherter Satz (z. B. aus Versehen 0 Wdh.) wird dabei entfernt.
+async function ueberspringe(rest) {
+  const aktiv = auswahl || naechsterPlatz();
+  if (!aktiv) return;
+  const einheit = await sichereEinheit(ctx.tagId);
+  let eintrag = einheit.eintraege.find(x => x.uebung === aktiv.uebung);
+  if (!eintrag) { eintrag = finde(aktiv.uebung).eintrag; einheit.eintraege.push(eintrag); }
+  const ziele = rest
+    ? plaetze(eintrag).filter(pl => pl.teil === aktiv.teil && pl.nr >= aktiv.nr && !satzVon(eintrag, pl.teil, pl.nr))
+    : [aktiv];
+  eintrag.uebersprungen = eintrag.uebersprungen || [];
+  for (const pl of ziele) {
+    eintrag.saetze = eintrag.saetze.filter(s => !(s.teil === pl.teil && s.nr === pl.nr));
+    if (!istUebersprungen(eintrag, pl.teil, pl.nr)) eintrag.uebersprungen.push({ teil: pl.teil, nr: pl.nr });
+  }
+  await speichereEinheit(einheit);
+  auswahl = null;
+  entwurf = null;
+  ctx = baueKontext();
+  toast(ziele.length > 1 ? `⏭ ${ziele.length} Sätze übersprungen` : '⏭ Satz übersprungen');
+  if (!naechsterPlatz()) { timer.stoppe(); setTimeout(() => toast('💪 Training geschafft – stark!'), 1200); }
   rerender();
 }
 
@@ -315,7 +381,7 @@ function verbinde(view, sheet) {
     } else if (a === 'zeile') {
       const { eintrag } = finde(el.dataset.u);
       const teil = +el.dataset.t;
-      const frei = plaetze(eintrag).find(pl => pl.teil === teil && !satzVon(eintrag, teil, pl.nr));
+      const frei = plaetze(eintrag).find(pl => pl.teil === teil && !satzVon(eintrag, teil, pl.nr) && !istUebersprungen(eintrag, teil, pl.nr));
       auswahl = frei || null;
       entwurf = null;
       rerender();
@@ -330,6 +396,9 @@ function verbinde(view, sheet) {
       const i = ids.indexOf(ctx.tagId);
       await setEinst('tagWahl', { datum: trainingsDatum(), tag: ids[(i + 1) % ids.length] });
       auswahl = null; entwurf = null;
+      rerender();
+    } else if (a === 'fertig-auf') {
+      await setEinst('fertigZu', null);
       rerender();
     } else if (a === 'haut') {
       document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'haut' } }));
@@ -353,19 +422,34 @@ function verbinde(view, sheet) {
     else if (a === 'kg-plus') aendereWert('kg', 1);
     else if (a === 'kg-tippen' || a === 'wdh-tippen') {
       const istKg = a === 'kg-tippen';
+      const aktivNow = auswahl || naechsterPlatz();
+      const inLb = istKg && istLb(S.uebungen[aktivNow?.uebung]);
       zahlEingeben({
-        titel: istKg ? 'Gewicht pro Hantel' : 'Wiederholungen',
-        wert: +el.textContent.replace(',', '.'),
-        einheit: istKg ? 'kg' : 'Wdh.',
+        titel: el.closest('.inp > div')?.querySelector('small')?.firstChild?.textContent.trim() || (istKg ? 'Gewicht' : 'Wiederholungen'),
+        wert: +el.textContent.replace(/\./g, '').replace(',', '.'),
+        einheit: istKg ? (inLb ? 'lb (Pfund) – wird intern in kg umgerechnet' : 'kg') : 'Wdh.',
         ganz: !istKg,
-        max: istKg ? 200 : 200,
-      }, v => aendereWert(istKg ? 'kg-setzen' : 'wdh-setzen', v));
+        max: inLb ? 1000 : 200,
+      }, v => aendereWert(istKg ? 'kg-setzen' : 'wdh-setzen', inLb ? lbZuKg(rundeLb(v)) : v));
+    }
+    else if (a === 'einheit-wechsel') {
+      // kg ⇄ lb für diese Übung merken (z. B. Maschine mit Pfund-Anzeige).
+      const aktivNow = auswahl || naechsterPlatz();
+      const ueb = aktivNow && S.uebungen[aktivNow.uebung];
+      if (!ueb) return;
+      await speichereUebung({ ...ueb, einheit: istLb(ueb) ? 'kg' : 'lb' });
+      if (!satzVon(finde(ueb.id).eintrag, aktivNow.teil, aktivNow.nr)) entwurf = null; // Vorschlag neu runden
+      toast(istLb(S.uebungen[ueb.id]) ? `${ueb.name}: jetzt in lb (Pfund)` : `${ueb.name}: jetzt in kg`);
+      rerender();
     }
     else if (a === 'band-minus') aendereWert('band', -1);
     else if (a === 'band-plus') aendereWert('band', 1);
     else if (a === 'speichern') speichereSatz();
     else if (a === 'weiter') { auswahl = null; entwurf = null; rerender(); }
     else if (a === 'loeschen') loescheSatz();
+    else if (a === 'skip') ueberspringe(false);
+    else if (a === 'skip-rest') ueberspringe(true);
+    else if (a === 'fertig-zu') { if (ctx?.einheit) await setEinst('fertigZu', ctx.einheit.id); rerender(); }
     else if (a === 'extra') {
       const aktiv = auswahl || naechsterPlatz();
       if (!aktiv) return;

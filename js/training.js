@@ -4,6 +4,10 @@ import { naechsterZustand, baueZiel } from './progression.js';
 import { heute, trainingsDatum, wochenStart, addTage, tageZwischen, uid, parseDatum } from './util.js';
 
 export const hatSaetze = e => !!e?.eintraege?.some(x => x.saetze?.length);
+// Übersprungene Sätze (nicht gemacht) stehen getrennt in eintrag.uebersprungen = [{ teil, nr }].
+// Sie zählen nirgends als Satz (keine 0 Wdh.), gelten aber als erledigt, damit das Training fertig wird.
+export const hatSkips = e => !!e?.eintraege?.some(x => x.uebersprungen?.length);
+export const istUebersprungen = (eintrag, teil, nr) => !!eintrag.uebersprungen?.some(s => s.teil === teil && s.nr === nr);
 
 export function einheitenSortiert() {
   return [...S.einheiten].sort((a, b) => (a.datum === b.datum ? (a.start || 0) - (b.start || 0) : a.datum < b.datum ? -1 : 1));
@@ -48,7 +52,8 @@ export function einheitHeute() {
 export function tagHeute() {
   const d = trainingsDatum();
   const ids = tagIds();
-  const e = einheitHeute();
+  // Training von heute: mit Sätzen, oder (selten) bisher nur mit übersprungenen Sätzen.
+  const e = einheitHeute() || S.einheiten.find(x => x.datum === d && hatSkips(x)) || null;
   if (e && S.tage[e.tag]) return { einheit: e, tagId: e.tag };
   const wahl = S.einst.tagWahl;
   if (wahl?.datum === d && S.tage[wahl.tag]) return { einheit: null, tagId: wahl.tag };
@@ -78,12 +83,12 @@ export function eintragFuer(einheit, ex) {
 // Heutiges Training holen oder beim ersten Satz anlegen.
 export async function sichereEinheit(tagId) {
   const d = trainingsDatum();
-  let e = S.einheiten.find(x => x.datum === d && hatSaetze(x)) || S.einheiten.find(x => x.datum === d);
+  let e = S.einheiten.find(x => x.datum === d && hatSaetze(x)) || S.einheiten.find(x => x.datum === d && hatSkips(x)) || S.einheiten.find(x => x.datum === d);
   const tag = S.tage[tagId];
   const uebIds = [...new Set(tag.paare.flat().filter(id => S.uebungen[id]))];
   if (!e) {
     e = { id: uid('e'), datum: d, tag: tagId, start: Date.now(), eintraege: [] };
-  } else if (!hatSaetze(e)) {
+  } else if (!hatSaetze(e) && !(hatSkips(e) && e.tag === tagId)) {
     e.tag = tagId;
     e.eintraege = [];
   }
@@ -99,7 +104,8 @@ export const satzVon = (eintrag, teil, nr) => eintrag.saetze.find(s => s.teil ==
 export function plaetze(eintrag) {
   return eintrag.ziel.teile.flatMap((p, teil) => {
     const geloggt = eintrag.saetze.filter(s => s.teil === teil);
-    const n = Math.max(p.saetze, geloggt.length ? Math.max(...geloggt.map(s => s.nr)) + 1 : 0);
+    const skips = (eintrag.uebersprungen || []).filter(s => s.teil === teil);
+  const n = Math.max(p.saetze, ...[...geloggt, ...skips].map(s => s.nr + 1));
     return Array.from({ length: n }, (_, nr) => ({ uebung: eintrag.uebung, teil, nr }));
   });
 }

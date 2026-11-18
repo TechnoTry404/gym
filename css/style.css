@@ -274,3 +274,24 @@ body.blink::after { content: ""; position: fixed; inset: 0; z-index: 100; pointe
 .produkt-datum small { display: block; font-size: 12px; }
 .produkt-datum input[type=date] { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: 15px; min-width: 0; max-width: 150px; }
 #tabs button { font-size: 10px; }
+
+/* Eingabe-Fenster oben (Tastatur verdeckt es nicht) */
+.modal-bg.oben { align-items: flex-start; bottom: auto; height: 100%; }
+.modal-bg.oben .modal { border-radius: 0 0 22px 22px; border-top: 0; border-bottom: 1px solid var(--line); padding: calc(env(safe-area-inset-top) + 12px) 16px 16px; max-height: 100%; }
+
+/* ✕ zum Wegklicken */
+.weg-x { position: absolute; right: 8px; top: 8px; width: 36px; height: 36px; border-radius: 50%; color: var(--dim); font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.haut-karte .tap { top: auto; bottom: 14px; }
+.fertig { position: relative; }
+.fertig .weg-x { right: -6px; top: -6px; }
+.fertig-zu { display: flex; align-items: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px 8px; padding: 10px 12px; border-radius: 14px; background: rgba(232,121,249,.1); border: 1px solid rgba(232,121,249,.35); font-size: 14px; text-align: left; }
+.fertig-zu span { flex: 1; }
+
+/* Übersprungene Sätze */
+.circ button.s { border-style: dashed; color: var(--dim); }
+.sh-aktionen { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.sh-aktionen .link { color: var(--muted); }
+
+/* kg ⇄ lb */
+.einheit-knopf { font-size: 11px; color: var(--pink); border: 1px solid rgba(232,121,249,.45); border-radius: 10px; padding: 1px 7px; margin-left: 4px; }
+.kg-klein { display: block; font-size: 11px; color: var(--teal); margin-top: 2px; }
