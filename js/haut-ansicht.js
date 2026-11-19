@@ -9,8 +9,15 @@ import { esc, trainingsDatum, addTage, wochenStart, fmtDatumLang, fmtDatumKurz, 
 
 let modus = 'liste'; // 'liste' oder 'einst'
 let viewRef = null;
+let gewaehlt = null; // anderer Tag zum Nachtragen (JJJJ-MM-TT), null = heute
 
-export function hautModus(m) { modus = m === 'einst' ? 'einst' : 'liste'; }
+export function hautModus(m) { modus = m === 'einst' ? 'einst' : 'liste'; gewaehlt = null; }
+
+// Welcher Tag wird gerade angezeigt? Nur heute oder ein vergangener Tag (nie die Zukunft).
+function anzeigeTag() {
+  const h = trainingsDatum();
+  return gewaehlt && gewaehlt < h ? gewaehlt : h;
+}
 
 const produkt = id => S.einst.hautProdukte.find(p => p.id === id);
 const fmtMonat = s => parseDatum(s).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -56,27 +63,35 @@ export function hautErinnerungen() {
 export function renderHaut(view) {
   viewRef = view;
   if (modus === 'einst') { renderEinst(view); return; }
-  const d = trainingsDatum();
+  const h = trainingsDatum();
+  const d = anzeigeTag();
+  const nachtragen = d !== h;
   const plan = S.einst.hautPlan;
   const e = S.haut[d];
   const w = wirkstoffFuer(e, plan, d);
-  const serie = hautSerie(S.haut, plan, d);
+  const serie = hautSerie(S.haut, plan, h);
   const mo = wochenStart(d);
 
   let html = `
     <div class="pad haut-kopf">
       <button class="zahn" data-a="einst" aria-label="Haut-Einstellungen">⚙︎</button>
       <h1>Haut</h1>
-      <p class="muted">${esc(fmtDatumLang(d))}</p>
+      <p class="muted">${esc(fmtDatumLang(h))}</p>
       <span class="fire">🔥 ${serie} ${serie === 1 ? 'Tag' : 'Tage'} am Stück</span>
     </div>
     <div class="woche">${HAUT_WOCHENTAGE.map((t, i) => {
       const tag = addTage(mo, i);
-      const wi = tag === d ? w : wirkstoffAm(plan, tag);
-      return `<div class="${tag === d ? 'heute' : ''}"><b>${t}</b><i class="p-${wi}"></i>${WIRKSTOFFE[wi].kurz}</div>`;
+      const wi = tag === d ? w : wirkstoffFuer(S.haut[tag], plan, tag);
+      const klasse = [tag === d ? 'heute' : '', tag === h ? 'jetzt' : '', tag > h ? 'zukunft' : ''].join(' ').trim();
+      // Vergangene Tage und heute antippbar (zum Nachtragen), Zukunft nicht.
+      const tipp = tag <= h ? ` data-a="tag" data-d="${tag}" role="button" aria-label="${esc(fmtDatumLang(tag))}"` : '';
+      return `<div class="${klasse}"${tipp}><b>${t}</b><i class="p-${wi}"></i>${WIRKSTOFFE[wi].kurz}</div>`;
     }).join('')}</div>
     <div class="legende"><span><i class="p-retinal"></i>Retinal</span><span><i class="p-bha"></i>BHA 2 %</span><span><i class="p-pause"></i>Pause</span></div>`;
 
+  if (nachtragen) {
+    html += `<div class="nachtrag"><span>✏️ Nachtragen für <b>${esc(fmtDatumLang(d))}</b></span><button class="mini" data-a="tag" data-d="${h}">Zurück zu heute</button></div>`;
+  }
   for (const r of hautErinnerungen()) {
     html += `<div class="erinnerung"><button class="txt" data-a="einst">${esc(r.text)}</button><button class="weg" data-a="erinnerung-weg" data-art="${r.art}" aria-label="Heute ausblenden">✕</button></div>`;
   }
@@ -102,19 +117,20 @@ export function renderHaut(view) {
   const g = e?.gereizt;
   html += `
     <div class="row haut-row" style="border:0">
-      <div class="n"><b>Haut gereizt?</b><span>nur als Notiz für heute Abend</span></div>
+      <div class="n"><b>Haut gereizt?</b><span>nur als Notiz für ${nachtragen ? 'diesen' : 'heute'} Abend</span></div>
       <div class="jn"><button data-a="gereizt" data-v="ja" class="${g === true ? 'on' : ''}">Ja</button><button data-a="gereizt" data-v="nein" class="${g === false ? 'on' : ''}">Nein</button></div>
     </div>`;
-  if (w === 'pause') html += '<p class="info pad">Heute Pause: kein Wirkstoff, damit sich die Haut erholt.</p>';
+  if (w === 'pause') html += `<p class="info pad">${nachtragen ? 'An diesem Tag' : 'Heute'} Pause: kein Wirkstoff, damit sich die Haut erholt.</p>`;
 
   // Kalender: letzte 14 Tage
   const tage = [];
-  for (let i = 13; i >= 0; i--) tage.push(addTage(d, -i));
+  for (let i = 13; i >= 0; i--) tage.push(addTage(h, -i));
   const voll = tage.filter(t => tagStatus(S.haut[t], plan, t) === 'voll').length;
   html += `
     <div class="chart" style="margin-top:12px">
       <div class="t"><b style="font-size:14px">Letzte 14 Tage</b><span style="color:var(--muted)">${voll} von 14 komplett</span></div>
-      <div class="kal">${tage.map(t => `<i class="k-${tagStatus(S.haut[t], plan, t)}${t === d ? ' heute' : ''}" title="${esc(fmtDatumKurz(t))}"></i>`).join('')}</div>
+      <div class="kal">${tage.map(t => `<button class="k-${tagStatus(S.haut[t], plan, t)}${t === d ? ' heute' : ''}" data-a="tag" data-d="${t}" aria-label="${esc(fmtDatumKurz(t))} nachtragen" title="${esc(fmtDatumKurz(t))}"></button>`).join('')}</div>
+      <p class="info" style="margin-bottom:0">Vergessen einzutragen? Tag oben oder hier antippen und nachtragen.</p>
       <div class="legende" style="margin:8px 0 0"><span><i class="kal-voll"></i>komplett</span><span><i class="kal-halb"></i>teilweise</span><span><i class="kal-leer"></i>nichts</span></div>
     </div>`;
   view.innerHTML = html;
@@ -126,7 +142,12 @@ async function klickListe(ev) {
   const el = ev.target.closest('[data-a]');
   if (!el) return;
   const a = el.dataset.a;
-  const d = trainingsDatum();
+  const d = anzeigeTag();
+  if (a === 'tag') {
+    const t = el.dataset.d;
+    gewaehlt = t && t < trainingsDatum() ? t : null;
+    renderHaut(viewRef); window.scrollTo(0, 0); return;
+  }
   if (a === 'einst') { modus = 'einst'; renderHaut(viewRef); window.scrollTo(0, 0); return; }
   if (a === 'erinnerung-weg') {
     await setEinst('erinnerungAus', { ...(S.einst.erinnerungAus || {}), [el.dataset.art]: heute() });
@@ -145,8 +166,9 @@ async function klickListe(ev) {
     const jetzt = teilStand(e, teil, e.wirkstoff).fertig;
     await speichereHaut(e);
     if (!vorher && jetzt) {
-      const serie = hautSerie(S.haut, S.einst.hautPlan, d);
-      toast(teil === 'morgen' ? '☀️ Morgenroutine erledigt' : `🌙 Abendroutine erledigt${serie ? ` · 🔥 ${serie} ${serie === 1 ? 'Tag' : 'Tage'}` : ''}`);
+      const serie = hautSerie(S.haut, S.einst.hautPlan, trainingsDatum());
+      const nach = d !== trainingsDatum() ? ' (nachgetragen)' : '';
+      toast(teil === 'morgen' ? `☀️ Morgenroutine erledigt${nach}` : `🌙 Abendroutine erledigt${nach}${serie ? ` · 🔥 ${serie} ${serie === 1 ? 'Tag' : 'Tage'}` : ''}`);
     }
   } else {
     const v = el.dataset.v === 'ja';

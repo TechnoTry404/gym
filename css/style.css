@@ -254,12 +254,12 @@ body.blink::after { content: ""; position: fixed; inset: 0; z-index: 100; pointe
 .jn button { padding: 8px 14px; border-radius: 10px; background: var(--knopf); font-size: 14px; color: var(--muted); border: 1px solid transparent; }
 .jn button.on { border-color: rgba(232,121,249,.7); color: #fff; }
 .kal { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 8px; }
-.kal i { aspect-ratio: 1; border-radius: 4px; background: var(--knopf); }
-.kal i.k-voll, .kal-voll { background: var(--grad); }
-.kal i.k-halb, .kal-halb { background: rgba(232,121,249,.35); }
+.kal > * { aspect-ratio: 1; border-radius: 4px; background: var(--knopf); padding: 0; min-width: 0; }
+.kal > .k-voll, .kal-voll { background: var(--grad); }
+.kal > .k-halb, .kal-halb { background: rgba(232,121,249,.35); }
 .kal-leer { background: var(--knopf); }
 .legende i.kal-voll, .legende i.kal-halb, .legende i.kal-leer { border-radius: 2px; }
-.kal i.heute { outline: 2px solid rgba(255,255,255,.7); outline-offset: 1px; }
+.kal > .heute { outline: 2px solid rgba(255,255,255,.7); outline-offset: 1px; }
 .hinweis-karte { display: block; width: calc(100% - 32px); margin: 0 16px 8px; text-align: left; font-size: 13px; line-height: 1.45; color: var(--muted); background: var(--card); border: 1px dashed rgba(232,121,249,.4); border-radius: 14px; padding: 10px 12px; }
 .haut-karte { background: linear-gradient(135deg, rgba(232,121,249,.22), rgba(139,92,246,.18)); border-color: rgba(232,121,249,.45); }
 .haut-karte small { display: block; font-size: 11px; color: var(--muted); letter-spacing: .08em; font-weight: 700; }
@@ -295,3 +295,10 @@ body.blink::after { content: ""; position: fixed; inset: 0; z-index: 100; pointe
 /* kg ⇄ lb */
 .einheit-knopf { font-size: 11px; color: var(--pink); border: 1px solid rgba(232,121,249,.45); border-radius: 10px; padding: 1px 7px; margin-left: 4px; }
 .kg-klein { display: block; font-size: 11px; color: var(--teal); margin-top: 2px; }
+
+/* Nachtragen (Haut) */
+.woche > div[data-a] { cursor: pointer; }
+.woche > div.jetzt b { color: var(--pink); }
+.woche > div.zukunft { opacity: .55; }
+.nachtrag { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; padding: 10px 12px; border-radius: 14px; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.4); font-size: 13px; }
+.nachtrag span { flex: 1; }
