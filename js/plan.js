@@ -110,33 +110,34 @@ export const ARTEN = {
   'ausdauer': 'Ausdauer (Minuten)',
 };
 
-// Kraft-Richtwerte je Übung: geschätztes Maximalgewicht (1 Wdh.) ÷ Körpergewicht
-// für [Anfänger, Einsteiger, Fortgeschritten, Sehr fortgeschritten, Elite] (Männer).
-// Angelehnt an strengthlevel.com (z. B. Latzug 0,5 / 0,75 / 1,0 / 1,5 / 1,75), Rest geschätzt und gerundet.
+// Kraft-Richtwerte je Übung: [Beginner, Novice, Intermediate, Advanced, Elite] als 1RM ÷ Körpergewicht (Männer).
+// Neu kalibriert am 25.11.2026 nach Strength Level (Zeile 70 kg Körpergewicht), Quellen und Begründung: S:\Gym-App\RANG_QUELLEN.md
+// Ränge: Silber = Novice (stärker als 20 %), Gold = Intermediate (50 %), Diamant = Advanced (80 %), Smaragd = Elite (95 %), Rubin = Schätzung darüber.
 // Kurzhanteln: pro Hantel. Klimmzug-Maschine: bewegtes Gewicht = Körpergewicht − Unterstützung.
 export const RANG_STANDARDS = {
-  schraegbank_kh: [0.15, 0.28, 0.45, 0.65, 0.9],
-  brustpresse: [0.4, 0.65, 1.0, 1.4, 1.85],
-  schraegbank_maschine: [0.35, 0.6, 0.9, 1.3, 1.7],
+  schraegbank_kh: [0.257, 0.357, 0.486, 0.643, 0.8], // Incline Dumbbell Bench Press
+  klimmzug_maschine: [0.971, 1.186, 1.443, 1.714, 2.014], // Pull Ups (Körpergewicht + Zusatz)
+  klimmzug_neutral: [0.971, 1.186, 1.443, 1.714, 2.014], // Neutral Grip Pull Ups ≈ Pull Ups
+  brustpresse: [0.471, 0.757, 1.143, 1.6, 2.1], // Chest Press
+  rudermaschine: [0.6, 1, 1.529, 2.171, 2.886], // keine eigenen Daten: FitnessVolt Machine Row × 1,2 Hebel-Zuschlag (Schätzung)
+  seitheben_kh: [0.057, 0.129, 0.214, 0.329, 0.457], // Dumbbell Lateral Raise
+  beinpresse: [1.286, 1.986, 2.886, 3.957, 5.129], // Sled Leg Press
+  schulterpresse: [0.329, 0.6, 0.943, 1.386, 1.871], // Machine Shoulder Press
+  latzug: [0.6, 0.814, 1.1, 1.414, 1.757], // Lat Pulldown
+  reverse_butterfly: [0.343, 0.557, 0.843, 1.171, 1.557], // Machine Reverse Fly
+  curls_kabel: [0.243, 0.414, 0.657, 0.957, 1.3], // Cable Bicep Curl
+  trizeps_kabel: [0.257, 0.443, 0.714, 1.043, 1.4], // Tricep Pushdown
+  beinbeuger: [0.486, 0.743, 1.086, 1.471, 1.914], // Seated Leg Curl
+  butterfly: [0.514, 0.786, 1.129, 1.529, 1.986], // Machine Chest Fly
+  hammercurls: [0.129, 0.2, 0.3, 0.414, 0.557], // Hammer Curl
+  trizeps_kopf_kabel: [0.157, 0.314, 0.529, 0.814, 1.129], // Cable Overhead Tricep Extension
+  // Alte Übungen (nur noch im Verlauf), unverändert geschätzt:
   kabelrudern: [0.5, 0.75, 1.05, 1.4, 1.8],
-  latzug: [0.5, 0.75, 1.0, 1.5, 1.75],
   seitheben_kabel: [0.08, 0.15, 0.25, 0.38, 0.5],
-  seitheben_kh: [0.05, 0.1, 0.17, 0.27, 0.38], // pro Hantel, angelehnt an strengthlevel.com (Dumbbell Lateral Raise)
-  reverse_butterfly: [0.2, 0.35, 0.55, 0.85, 1.2], // geschätzt
-  beinpresse: [1.0, 1.75, 2.75, 4.0, 5.25],
-  schulterpresse: [0.3, 0.5, 0.8, 1.15, 1.55],
   facepull_kabel: [0.25, 0.4, 0.6, 0.85, 1.1],
-  curls_kabel: [0.2, 0.35, 0.55, 0.8, 1.1],
-  trizeps_kabel: [0.2, 0.4, 0.65, 0.95, 1.3],
-  beinbeuger: [0.35, 0.55, 0.85, 1.2, 1.6],
   rudern: [0.2, 0.35, 0.55, 0.8, 1.1],
   fliegende_kabel: [0.1, 0.2, 0.35, 0.55, 0.8],
-  rudermaschine: [0.4, 0.65, 0.95, 1.3, 1.7],
-  butterfly: [0.3, 0.5, 0.8, 1.15, 1.5],
-  hammercurls: [0.1, 0.2, 0.32, 0.48, 0.65],
-  trizeps_kopf_kabel: [0.15, 0.3, 0.5, 0.75, 1.05],
-  klimmzug_maschine: [0.5, 0.8, 1.1, 1.35, 1.6],
-  klimmzug_neutral: [0.5, 0.8, 1.1, 1.35, 1.6],
+  schraegbank_maschine: [0.3, 0.55, 1.25, 1.6, 2.3],
 };
 
 export const WOCHENTAGE = ['—', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']; // Index 1 = Montag

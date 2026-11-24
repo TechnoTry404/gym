@@ -25,11 +25,11 @@ export function fortschrittModus(m) { modus = m; unter = null; }
 // ---------- Rang ----------
 const RANG_TEXT = [
   'Startrang – jeder fängt hier an.',
-  'Einsteiger: die ersten Monate regelmäßig trainiert.',
-  'Fortgeschritten: solide Kraft, meist nach 1–2 Jahren.',
-  'Stark: deutlich über dem Durchschnitt im Gym.',
-  'Sehr stark: jahrelanges, konsequentes Training.',
-  'Elite: die Spitze – nur sehr wenige kommen hierhin.',
+  'Stärker als ca. 20 % der Gym-Gänger (meist nach ~6 Monaten Training).',
+  'Stärker als ca. 50 % – Durchschnitt nach ~2 Jahren Training.',
+  'Stärker als ca. 80 % – meist mehrere Jahre konsequentes Training.',
+  'Stärker als ca. 95 % – Elite im Gym.',
+  'Die obersten ~1–2 % (geschätzt).',
 ];
 function alleRaengeZeigen() {
   const g = gesamtRang();
@@ -43,6 +43,7 @@ function alleRaengeZeigen() {
       ${rangChip(i)}</div>`).join('');
   modal(`<h3>Alle Ränge</h3>
     <p class="info">Von unten nach oben: Bronze → Silber → Gold → Diamant → Smaragd → Rubin. Beispielgewichte bei ${fmtZahl(bw)} kg Körpergewicht.</p>
+    <p class="info">⚙️ Maschinen mit Hebel (Rudermaschine, Brustpresse, Butterfly …) werden strenger bewertet, weil sie höhere Zahlen zeigen als freie Gewichte. 🔁 Diamant, Smaragd und Rubin zählen erst, wenn du den Wert in 2 verschiedenen Trainings schaffst. 📚 Richtwerte nach Strength Level (Millionen eingetragener Sätze), Rubin geschätzt.</p>
     ${zeilen}
     <p class="info">Jede Übung bekommt ihren eigenen Rang, dein Gesamtrang ist der gerundete Durchschnitt. Disziplin-Punkte können ihn zusätzlich anheben.</p>
     <button class="knopf haupt" data-a="zu">Schließen</button>`, root => {
@@ -111,12 +112,14 @@ function raengeJeUebung() {
 
 function rangZeile(x, pct) {
   {
-    const wdh = Math.min(x.satz.wdh, 20);
+    const wdh = Math.min(x.satz.wdh, 12); // wie in der Rang-Formel
     const faktor = 1 + wdh / 30;
     const hilfe = x.teil?.typ === 'hilfe-kg';
     const jetzt = hilfe ? `${fmtZahl(x.satz.kg ?? x.teil.kg)} kg Hilfe × ${x.satz.wdh}` : `${fmtZahl(x.satz.kg ?? x.teil.kg)} kg × ${x.satz.wdh}`;
     let ziel = 'Höchster Rang erreicht';
-    if (x.naechste != null) {
+    if (x.bestaetigen != null) {
+      ziel = `Für ${RAENGE[x.bestaetigen]}: diesen Wert in einem 2. Training schaffen`;
+    } else if (x.naechste != null) {
       const kg = x.naechste / faktor;
       ziel = hilfe
         ? `Für ${RAENGE[x.i + 1]}: ${Math.max(0, x.bw - kg) > 0 ? '≈ ' + fmtZahl(Math.floor(Math.max(0, x.bw - kg) * 2) / 2) + ' kg Hilfe' : 'ohne Hilfe'} × ${wdh}`

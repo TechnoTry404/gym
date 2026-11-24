@@ -31,12 +31,12 @@ export function rangAus(wert, grenzen) {
 }
 
 // Kraft-Richtwerte → Startgrenzen der 6 Ränge (als Vielfaches des Körpergewichts).
-// Strenger seit 24.11.2026: Silber = zwischen Einsteiger und Fortgeschritten, Gold = Fortgeschritten,
-// Diamant = Sehr fortgeschritten, Smaragd = zwischen Sehr fortgeschritten und Elite, Rubin = Elite.
-// (Vorher: Silber schon ab Einsteiger.)
+// Seit 25.11.2026 an Strength-Level-Stufen gekoppelt (Quellen: S:Gym-AppRANG_QUELLEN.md):
+// Silber = Novice (stärker als 20 %), Gold = Intermediate (50 %), Diamant = Advanced (80 %), Smaragd = Elite (95 %),
+// Rubin = Elite + 60 % des Abstands Advanced→Elite (Schätzung für die obersten ~1–2 %).
 export function kraftGrenzen(std) {
-  const [, einsteiger, fortg, sehr, elite] = std;
-  return [0, (einsteiger + fortg) / 2, fortg, sehr, (sehr + elite) / 2, elite];
+  const [, novice, inter, adv, elite] = std;
+  return [0, novice, inter, adv, elite, elite + 0.6 * (elite - adv)];
 }
 
 // Geschätztes Maximalgewicht (1 Wdh.) eines Satzes, Formel nach Epley.
@@ -50,6 +50,19 @@ export function e1rm(satz, teil, bw) {
   return 0;
 }
 
+// Diamant, Smaragd und Rubin zählen erst, wenn der Wert in mindestens 2 verschiedenen Trainings erreicht wurde
+// (kein hoher Rang durch einen einzelnen Ausreißer). Sonst höchstens Gold bzw. der Rang des zweitbesten Trainings.
+export const BESTAETIGEN_AB = 3;
+export function rangMitBestaetigung(proTraining, grenzen) {
+  const w = [...proTraining].sort((a, b) => b - a);
+  const r = rangAus(w[0] || 0, grenzen);
+  if (r.i < BESTAETIGEN_AB) return r;
+  const i2 = rangAus(w[1] || 0, grenzen).i;
+  if (i2 >= r.i) return r;
+  const i = Math.max(BESTAETIGEN_AB - 1, i2);
+  return { i, anteil: 1, naechste: grenzen[i + 1], bestaetigen: r.i };
+}
+
 // Ränge aller Übungen im aktuellen Plan, die Richtwerte haben.
 export function uebungsRaenge() {
   const { kg: bw } = koerpergewicht();
@@ -61,21 +74,24 @@ export function uebungsRaenge() {
     const std = ex?.standard || RANG_STANDARDS[id];
     if (!ex || !std) continue;
     let best = 0, bestSatz = null, bestTeil = null;
+    const proTraining = []; // bester Wert je Training (für die 2-Trainings-Regel)
     for (const e of S.einheiten) {
       if (e.datum < start) continue;
       const gleiche = gleicheIds(id); // inkl. Vorgänger mit denselben Gewichten
+      let bestHier = 0;
       for (const en of (e.eintraege || []).filter(x => gleiche.has(x.uebung))) {
         for (const s of en.saetze) {
           const teil = en.ziel?.teile?.[s.teil];
           const v = e1rm(s, teil, bw);
+          if (v > bestHier) bestHier = v;
           if (v > best) { best = v; bestSatz = s; bestTeil = teil; }
         }
       }
+      if (bestHier > 0) proTraining.push(bestHier);
     }
     if (!best) { out.push({ ex, ohneDaten: true }); continue; }
     const grenzen = kraftGrenzen(std).map(x => x * bw);
-    const r = rangAus(best, grenzen);
-    out.push({ ex, e1rm: best, satz: bestSatz, teil: bestTeil, bw, ...r });
+    out.push({ ex, e1rm: best, satz: bestSatz, teil: bestTeil, bw, ...rangMitBestaetigung(proTraining, grenzen) });
   }
   return out;
 }
