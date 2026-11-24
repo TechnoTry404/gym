@@ -1,5 +1,5 @@
 // Start der App: Daten laden, Tabs, Offline-Speicher und automatische Updates.
-import { ladeAlles, S } from './store.js';
+import { ladeAlles, S, modulAn } from './store.js';
 import { dauerhaftAnfragen } from './db.js';
 import { renderHeute, heuteInit, heuteTick } from './heute.js';
 import { renderFortschritt, fortschrittZuruecksetzen, fortschrittModus } from './fortschritt.js';
@@ -20,6 +20,10 @@ function zeige(neu) {
     if (neu === 'haut' && tab !== 'haut') hautModus('liste');
     tab = neu;
   }
+  // Hautpflege ausgeschaltet (Mehr → Bereiche)? Dann kein Haut-Tab.
+  const hautKnopf = document.querySelector('#tabs [data-tab=haut]');
+  if (hautKnopf) hautKnopf.hidden = !modulAn('haut');
+  if (tab === 'haut' && !modulAn('haut')) tab = 'heute';
   const view = $('#view');
   const sheet = $('#sheet');
   view.onclick = null;
@@ -88,12 +92,12 @@ async function start() {
   });
   zeige(startTab);
   if (startWiegen) wiegenOeffnen();
-  pushPruefen().then(() => { if (tab === 'haut') zeige(); });
+  if (modulAn('haut')) pushPruefen().then(() => { if (tab === 'haut') zeige(); });
   try {
     const neu = sessionStorage.getItem('gym-neuer-plan');
     if (neu) {
       sessionStorage.removeItem('gym-neuer-plan');
-      const text = neu === 'v3' ? '🏋️ Freitag neu: Brustpresse, Rudermaschine, Butterfly' : '🏋️ Neuer Gym-Plan aktiv: Mo A · Mi B · Fr C';
+      const text = neu === 'v4' ? '🏋️ Plan neu: Rudermaschine, Seitheben mit Hanteln, Reverse Butterfly' : neu === 'v3' ? '🏋️ Freitag neu: Brustpresse, Rudermaschine, Butterfly' : '🏋️ Neuer Gym-Plan aktiv: Mo A · Mi B · Fr C';
       setTimeout(() => toast(text, 4000), 900);
     }
   } catch { /* egal */ }

@@ -1,5 +1,5 @@
 // Training-Logik: welcher Tag heute dran ist, Ziele, Sätze, Wochenziel, Erinnerungen.
-import { S, speichereEinheit } from './store.js';
+import { S, speichereEinheit, modulAn } from './store.js';
 import { naechsterZustand, baueZiel } from './progression.js';
 import { heute, trainingsDatum, wochenStart, addTage, tageZwischen, uid, parseDatum } from './util.js';
 
@@ -8,6 +8,17 @@ export const hatSaetze = e => !!e?.eintraege?.some(x => x.saetze?.length);
 // Sie zählen nirgends als Satz (keine 0 Wdh.), gelten aber als erledigt, damit das Training fertig wird.
 export const hatSkips = e => !!e?.eintraege?.some(x => x.uebersprungen?.length);
 export const istUebersprungen = (eintrag, teil, nr) => !!eintrag.uebersprungen?.some(s => s.teil === teil && s.nr === nr);
+
+// Gleiche Übung im Verlauf: die Übung selbst und ihre „Vorgänger“ (gleiche Gewichte, z. B. Kabelrudern → Rudermaschine).
+export function gleicheIds(id) {
+  return new Set([id, ...(S.uebungen[id]?.vorgaenger || [])]);
+}
+// Zu welcher aktuellen Übung gehört ein gespeicherter Eintrag? (Vorgänger → Nachfolger im Plan)
+export function nachfolgerVon(id, imPlan) {
+  if (imPlan.has(id)) return id;
+  for (const n of imPlan) if (S.uebungen[n]?.vorgaenger?.includes(id)) return n;
+  return id;
+}
 
 export function einheitenSortiert() {
   return [...S.einheiten].sort((a, b) => (a.datum === b.datum ? (a.start || 0) - (b.start || 0) : a.datum < b.datum ? -1 : 1));
@@ -22,7 +33,8 @@ export function letzterEintrag(uebId, ausserId) {
   const list = einheitenSortiert();
   for (let i = list.length - 1; i >= 0; i--) {
     if (list[i].id === ausserId) continue;
-    const en = list[i].eintraege?.find(x => x.uebung === uebId && x.saetze?.length);
+    const ids = gleicheIds(uebId);
+    const en = list[i].eintraege?.find(x => ids.has(x.uebung) && x.saetze?.length);
     if (en) return en;
   }
   return null;
@@ -200,6 +212,7 @@ export function faelligeErinnerungen() {
   const out = [];
   for (const [art, info] of Object.entries(MESS_ARTEN)) {
     if (aus[art] === d) continue;
+    if ((art === 'gewicht' && !modulAn('wiegen')) || (art === 'klimmzugMax' && !modulAn('maxtest'))) continue;
     const l = letzteMessung(art);
     if (info.montags) {
       if (!l || l.datum < wochenStart(d)) out.push({ art, text: `${info.icon} ${info.text}` });

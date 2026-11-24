@@ -6,13 +6,14 @@
 // um 25 % des Abstands an (sie zieht nie nach unten).
 // Beispiel: 4 × Gold + 2 × Silber → Ø 1,67 → gerundet Gold.
 import { S } from './store.js';
-import { einheitenSortiert, hatSaetze } from './training.js';
+import { einheitenSortiert, hatSaetze, gleicheIds, nachfolgerVon } from './training.js';
 import { leistung } from './progression.js';
 import { RANG_STANDARDS } from './plan.js';
 import { heute, addTage, wochenStart } from './util.js';
 
 export const RAENGE = ['Bronze', 'Silber', 'Gold', 'Diamant', 'Smaragd', 'Rubin'];
-export const XP_GRENZEN = [0, 1500, 4000, 8000, 14000, 22000];
+// Strenger seit 24.11.2026 (vorher 0/1500/4000/8000/14000/22000): Silber nach ca. 3–4 Wochen, Rubin nach rund einem Jahr.
+export const XP_GRENZEN = [0, 3000, 8000, 16000, 28000, 45000];
 export const KRAFT_TAGE = 42;
 
 export function koerpergewicht() {
@@ -30,15 +31,19 @@ export function rangAus(wert, grenzen) {
 }
 
 // Kraft-Richtwerte → Startgrenzen der 6 Ränge (als Vielfaches des Körpergewichts).
+// Strenger seit 24.11.2026: Silber = zwischen Einsteiger und Fortgeschritten, Gold = Fortgeschritten,
+// Diamant = Sehr fortgeschritten, Smaragd = zwischen Sehr fortgeschritten und Elite, Rubin = Elite.
+// (Vorher: Silber schon ab Einsteiger.)
 export function kraftGrenzen(std) {
   const [, einsteiger, fortg, sehr, elite] = std;
-  return [0, einsteiger, fortg, (fortg + sehr) / 2, sehr, elite];
+  return [0, (einsteiger + fortg) / 2, fortg, sehr, (sehr + elite) / 2, elite];
 }
 
 // Geschätztes Maximalgewicht (1 Wdh.) eines Satzes, Formel nach Epley.
 export function e1rm(satz, teil, bw) {
   const kg = typeof satz.kg === 'number' ? satz.kg : teil?.kg ?? 0;
-  const wdh = Math.min(satz.wdh, 20);
+  // Über 12 Wdh. überschätzt die Formel das Maximalgewicht stark → höchstens 12 Wdh. werten.
+  const wdh = Math.min(satz.wdh, 12);
   if (!satz.wdh) return 0;
   if (teil?.typ === 'hilfe-kg') return Math.max(0, bw - kg) * (1 + wdh / 30);
   if (teil?.typ === 'hantel') return kg * (1 + wdh / 30);
@@ -58,12 +63,13 @@ export function uebungsRaenge() {
     let best = 0, bestSatz = null, bestTeil = null;
     for (const e of S.einheiten) {
       if (e.datum < start) continue;
-      const en = e.eintraege?.find(x => x.uebung === id);
-      if (!en) continue;
-      for (const s of en.saetze) {
-        const teil = en.ziel?.teile?.[s.teil];
-        const v = e1rm(s, teil, bw);
-        if (v > best) { best = v; bestSatz = s; bestTeil = teil; }
+      const gleiche = gleicheIds(id); // inkl. Vorgänger mit denselben Gewichten
+      for (const en of (e.eintraege || []).filter(x => gleiche.has(x.uebung))) {
+        for (const s of en.saetze) {
+          const teil = en.ziel?.teile?.[s.teil];
+          const v = e1rm(s, teil, bw);
+          if (v > best) { best = v; bestSatz = s; bestTeil = teil; }
+        }
       }
     }
     if (!best) { out.push({ ex, ohneDaten: true }); continue; }
@@ -90,14 +96,16 @@ export function disziplinXP(ohne = null) {
     const komplett = e.eintraege.every(en => en.saetze.length >= (en.ziel?.teile || []).reduce((n, t) => n + t.saetze, 0));
     if (komplett) xp += 50;
     for (const en of e.eintraege) {
-      if (!en.saetze?.length || !imPlan.has(en.uebung)) continue;
+      // Vorgänger (z. B. Kabelrudern) zählen als ihre neue Übung (Rudermaschine).
+      const id = nachfolgerVon(en.uebung, imPlan);
+      if (!en.saetze?.length || !imPlan.has(id)) continue;
       if (en.gesteigert) xp += 20;
-      const ex = S.uebungen[en.uebung];
+      const ex = S.uebungen[id];
       if (!ex) continue;
       const v = leistung(ex, en, S.einst.baender, bw);
       if (v == null) continue;
-      if (bestBisher[en.uebung] != null && v > bestBisher[en.uebung] + 1e-6) xp += 30;
-      bestBisher[en.uebung] = Math.max(bestBisher[en.uebung] ?? -Infinity, v);
+      if (bestBisher[id] != null && v > bestBisher[id] + 1e-6) xp += 30;
+      bestBisher[id] = Math.max(bestBisher[id] ?? -Infinity, v);
     }
     const w = wochenStart(e.datum);
     proWoche[w] = (proWoche[w] || 0) + 1;

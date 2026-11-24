@@ -15,7 +15,7 @@ export const BAND_FARBEN = {
 };
 
 // Version des Standardplans. Höher als auf dem iPhone gespeichert → Plan wird beim Öffnen umgestellt.
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
 
 // Gym-Plan (ab 15.11.2026): Mo / Mi / Fr, ca. 60 Min.
 export const STANDARD_UEBUNGEN = [
@@ -39,10 +39,16 @@ export const STANDARD_UEBUNGEN = [
   { id: 'rudern', name: 'Einarmiges Kurzhantelrudern', art: 'hantel', saetze: 3, min: 8, max: 12, proSeite: 'pro Arm', startKg: 12, schritt: 2, maxKg: null },
   { id: 'fliegende_kabel', name: 'Fliegende am Kabel (unten → oben)', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 7.5, schritt: 2.5 },
   // Ab Plan-Version 3 (15.11.2026) am Freitag statt Kurzhantelrudern und Fliegenden:
-  { id: 'rudermaschine', name: 'Rudermaschine (brustgestützt)', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 35, schritt: 5 },
+  // vorgaenger: frühere Übung mit denselben Gewichten (zählt für Steigerung, Kraft und Rang mit).
+  // Montags-„Kabelrudern“ wurde in Wahrheit an der Brustpolster-Maschine gemacht (Nutzer, 24.11.2026).
+  { id: 'rudermaschine', name: 'Rudermaschine (brustgestützt)', art: 'maschine', saetze: 3, min: 8, max: 12, startKg: 35, schritt: 5, vorgaenger: ['kabelrudern'] },
   { id: 'butterfly', name: 'Butterfly-Maschine', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 30, schritt: 5 },
   { id: 'hammercurls', name: 'Hammercurls', art: 'hantel', saetze: 3, min: 10, max: 15, startKg: 10, schritt: 2, maxKg: null },
   { id: 'trizeps_kopf_kabel', name: 'Trizeps über Kopf am Kabel', art: 'maschine', saetze: 3, min: 10, max: 15, startKg: 15, schritt: 2.5 },
+  // Ab Plan-Version 4 (24.11.2026): Seitheben immer mit Kurzhanteln (die Werte vom „Kabel“ waren schon Hanteln),
+  // Reverse Butterfly statt Face Pulls (andere Maschine → eigener Start, alte Werte bleiben im Verlauf).
+  { id: 'seitheben_kh', name: 'Seitheben Kurzhanteln', art: 'hantel', saetze: 4, min: 12, max: 20, startKg: 5, schritt: 2, maxKg: null, vorgaenger: ['seitheben_kabel'] },
+  { id: 'reverse_butterfly', name: 'Reverse Butterfly (Maschine)', art: 'maschine', saetze: 3, min: 12, max: 15, startKg: 25, schritt: 5 },
   // Am Ende jedes Trainings
   { id: 'laufband', name: 'Laufband mit Steigung', art: 'ausdauer', saetze: 1, min: 10, max: 20 },
 ];
@@ -65,14 +71,16 @@ export const HEIM_UEBUNGEN = [
 
 // Austausch beim Umstieg auf Plan-Version 3 (nur Tag C, andere Änderungen bleiben).
 export const TAUSCH_V3 = { schraegbank_maschine: 'brustpresse', rudern: 'rudermaschine', fliegende_kabel: 'butterfly' };
+// Austausch beim Umstieg auf Plan-Version 4 (24.11.2026), ebenfalls nur diese Übungen.
+export const TAUSCH_V4 = { kabelrudern: 'rudermaschine', seitheben_kabel: 'seitheben_kh', facepull_kabel: 'reverse_butterfly' };
 
 export const STANDARD_TAGE = [
   { id: 'A', name: 'Brust und Rücken', wochentag: 1,
-    paare: [['schraegbank_kh'], ['klimmzug_maschine'], ['brustpresse'], ['kabelrudern'], ['seitheben_kabel'], ['beinpresse'], ['laufband']] },
+    paare: [['schraegbank_kh'], ['klimmzug_maschine'], ['brustpresse'], ['rudermaschine'], ['seitheben_kh'], ['beinpresse'], ['laufband']] },
   { id: 'B', name: 'Schultern und Arme', wochentag: 3,
-    paare: [['schulterpresse'], ['latzug'], ['seitheben_kabel'], ['facepull_kabel'], ['curls_kabel', 'trizeps_kabel'], ['beinbeuger'], ['laufband']] },
+    paare: [['schulterpresse'], ['latzug'], ['seitheben_kh'], ['reverse_butterfly'], ['curls_kabel', 'trizeps_kabel'], ['beinbeuger'], ['laufband']] },
   { id: 'C', name: 'Brust, Rücken, Arme', wochentag: 5,
-    paare: [['klimmzug_neutral'], ['brustpresse'], ['rudermaschine'], ['butterfly'], ['seitheben_kabel'], ['hammercurls', 'trizeps_kopf_kabel'], ['laufband']] },
+    paare: [['klimmzug_neutral'], ['brustpresse'], ['rudermaschine'], ['butterfly'], ['seitheben_kh'], ['hammercurls', 'trizeps_kopf_kabel'], ['laufband']] },
 ];
 
 export const STANDARD_EINSTELLUNGEN = {
@@ -113,6 +121,8 @@ export const RANG_STANDARDS = {
   kabelrudern: [0.5, 0.75, 1.05, 1.4, 1.8],
   latzug: [0.5, 0.75, 1.0, 1.5, 1.75],
   seitheben_kabel: [0.08, 0.15, 0.25, 0.38, 0.5],
+  seitheben_kh: [0.05, 0.1, 0.17, 0.27, 0.38], // pro Hantel, angelehnt an strengthlevel.com (Dumbbell Lateral Raise)
+  reverse_butterfly: [0.2, 0.35, 0.55, 0.85, 1.2], // geschätzt
   beinpresse: [1.0, 1.75, 2.75, 4.0, 5.25],
   schulterpresse: [0.3, 0.5, 0.8, 1.15, 1.55],
   facepull_kabel: [0.25, 0.4, 0.6, 0.85, 1.1],

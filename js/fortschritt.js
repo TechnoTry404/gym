@@ -1,6 +1,6 @@
 // Fortschritt: Kraft-Übersicht (seit Tag 1 / letzte 30 Tage), Körperdaten mit Grafiken, Verlauf.
-import { S, speichereEinheit, loescheEinheit, loescheMessung } from './store.js';
-import { einheitenSortiert, hatSaetze, MESS_ARTEN, zusammenfassung as trainingsSumme, zusammenfassungHtml } from './training.js';
+import { S, speichereEinheit, loescheEinheit, loescheMessung, modulAn } from './store.js';
+import { einheitenSortiert, hatSaetze, gleicheIds, MESS_ARTEN, zusammenfassung as trainingsSumme, zusammenfassungHtml } from './training.js';
 import { leistung, FREI } from './progression.js';
 import { linie, balken } from './charts.js';
 import { gesamtRang, rangChip, RAENGE, XP_GRENZEN, kraftGrenzen, koerpergewicht as koerpergewichtRang } from './rang.js';
@@ -131,7 +131,8 @@ function planUebungen() {
 function verlaufUebung(ex) {
   const out = [];
   for (const e of einheitenSortiert()) {
-    const en = e.eintraege?.find(x => x.uebung === ex.id && x.saetze?.length);
+    const ids = gleicheIds(ex.id);
+    const en = e.eintraege?.find(x => ids.has(x.uebung) && x.saetze?.length);
     if (!en) continue;
     const wert = leistung(ex, en, S.einst.baender, koerpergewicht());
     if (wert != null) out.push({ datum: e.datum, wert, eintrag: en });
@@ -257,8 +258,9 @@ export function renderFortschritt(view) {
   else if (unter === 'raenge') html = raengeJeUebung();
   else if (unter && typeof unter === 'object' && unter.einheit) html = detailEinheit(unter.einheit);
   else {
+    if (modus === 'rang' && !modulAn('rang')) modus = 'kraft';
     html = `<div class="pad"><h1>Fortschritt</h1></div>
-      <div class="seg">${[['rang', 'Rang'], ['kraft', 'Kraft'], ['koerper', 'Körper'], ['verlauf', 'Verlauf']]
+      <div class="seg">${[['rang', 'Rang'], ['kraft', 'Kraft'], ['koerper', 'Körper'], ['verlauf', 'Verlauf']].filter(([k]) => k !== 'rang' || modulAn('rang'))
         .map(([k, t]) => `<button class="${modus === k ? 'on' : ''}" data-a="modus" data-k="${k}">${t}</button>`).join('')}</div>`;
     html += modus === 'rang' ? rangAnsicht() : modus === 'kraft' ? kraft() : modus === 'koerper' ? koerper() : verlauf();
   }

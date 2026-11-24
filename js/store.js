@@ -1,6 +1,6 @@
 // Alle Daten im Arbeitsspeicher (schnell) + sofort in die Datenbank schreiben (kein Speichern-Knopf).
 import * as db from './db.js';
-import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION, TAUSCH_V3 } from './plan.js';
+import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION, TAUSCH_V3, TAUSCH_V4 } from './plan.js';
 import { produkteErgaenzen, STANDARD_HAUT_ZEITEN } from './haut.js';
 import { heute, toast } from './util.js';
 
@@ -27,7 +27,11 @@ export async function ladeAlles() {
   S.einst.hautProdukte = produkteErgaenzen(S.einst.hautProdukte);
   S.einst.hautZeiten = { ...STANDARD_HAUT_ZEITEN, ...(S.einst.hautZeiten || {}) };
   if (!S.einst.ersteNutzung) await setEinst('ersteNutzung', heute());
-  if ((S.einst.planVersion || 1) < PLAN_VERSION) await planUmstellen();
+  if ((S.einst.planVersion || 1) < PLAN_VERSION) {
+    // Eigener Plan (aus einer Plan-Datei): nie durch den Standardplan ersetzen.
+    if (S.einst.eigenerPlan) await setEinst('planVersion', PLAN_VERSION);
+    else await planUmstellen();
+  }
 }
 
 // Einmalige Umstellung auf einen neuen Standardplan (z. B. Heim → Gym).
@@ -36,18 +40,25 @@ async function planUmstellen() {
   const alt = S.einst.planVersion || 1;
   if (alt >= 2) {
     // Schritt 2 → 3: Freitag umbauen (Rudern/Schrägbank/Fliegende → Rudermaschine/Brustpresse/Butterfly).
-    // Nur austauschen – deine übrigen Änderungen am Plan bleiben.
+    // Schritt 3 → 4: Kabelrudern → Rudermaschine, Seitheben Kabel → Kurzhanteln, Face Pulls → Reverse Butterfly.
+    // Nur austauschen – deine übrigen Änderungen am Plan bleiben. Gespeicherte Trainings werden nicht verändert.
+    const tausch = { ...(alt <= 2 ? TAUSCH_V3 : {}), ...(alt <= 3 ? TAUSCH_V4 : {}) };
     const neu = STANDARD_UEBUNGEN.filter(u => !S.uebungen[u.id]);
-    const tage = Object.values(S.tage).map(t => ({ ...t, paare: t.paare.map(p => p.map(id => TAUSCH_V3[id] || id)) }));
+    // Vorhandene Übungen bekommen ihre „Vorgänger“ (alte Werte zählen weiter), sonst bleibt alles wie eingestellt.
+    const ergaenzt = STANDARD_UEBUNGEN.filter(u => u.vorgaenger && S.uebungen[u.id])
+      .map(u => ({ ...S.uebungen[u.id], vorgaenger: [...new Set([...(S.uebungen[u.id].vorgaenger || []), ...u.vorgaenger])] }));
+    const tage = Object.values(S.tage).map(t => ({ ...t, paare: t.paare.map(p => [...new Set(p.map(id => tausch[id] || id))]) }));
     await db.vieleSpeichern([
       ...neu.map(wert => ({ store: 'uebungen', wert: { ...wert } })),
+      ...ergaenzt.map(wert => ({ store: 'uebungen', wert })),
       ...tage.map(wert => ({ store: 'tage', wert })),
       { store: 'einstellungen', wert: { key: 'planVersion', wert: PLAN_VERSION } },
     ]);
     for (const u of neu) S.uebungen[u.id] = { ...u };
+    for (const u of ergaenzt) S.uebungen[u.id] = u;
     for (const t of tage) S.tage[t.id] = t;
     S.einst.planVersion = PLAN_VERSION;
-    try { sessionStorage.setItem('gym-neuer-plan', 'v3'); } catch { /* egal */ }
+    try { sessionStorage.setItem('gym-neuer-plan', alt <= 3 ? 'v4' : 'v3'); } catch { /* egal */ }
     return;
   }
   await db.vieleSpeichern([
@@ -67,6 +78,15 @@ async function sicher(fn) {
   try { await fn(); }
   catch (err) { console.error(err); toast('⚠️ Speichern fehlgeschlagen: ' + (err?.message || err)); throw err; }
 }
+
+// Bereiche an/aus (Mehr → Bereiche). Standard: alles an.
+export const MODULE = {
+  haut: 'Hautpflege (Tab „Haut“, Push-Erinnerungen)',
+  rang: 'Rangliste (Bronze bis Rubin, XP)',
+  wiegen: 'Wiegen-Erinnerung montags',
+  maxtest: 'Klimmzug-Maxtest-Erinnerung',
+};
+export function modulAn(name) { return S.einst.module?.[name] !== false; }
 
 export function setEinst(key, wert) {
   S.einst[key] = wert;

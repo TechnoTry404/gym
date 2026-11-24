@@ -302,3 +302,5 @@ body.blink::after { content: ""; position: fixed; inset: 0; z-index: 100; pointe
 .woche > div.zukunft { opacity: .55; }
 .nachtrag { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; padding: 10px 12px; border-radius: 14px; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.4); font-size: 13px; }
 .nachtrag span { flex: 1; }
+
+#tabs button[hidden] { display: none; }

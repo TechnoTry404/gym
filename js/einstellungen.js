@@ -1,6 +1,7 @@
 // Tab „Plan“ (Übungen und Tage ändern) und Tab „Mehr“ (Pause, Bänder, Backup, Speicher).
 // Jede Änderung wird sofort gespeichert.
-import { S, setEinst, speichereUebung, loescheUebung, speichereTag } from './store.js';
+import { S, setEinst, speichereUebung, loescheUebung, speichereTag, MODULE, modulAn } from './store.js';
+import { planImportieren, planExportieren } from './plandatei.js';
 import { ARTEN, WOCHENTAGE } from './plan.js';
 import { bandPunkt, modal, schliesseModal } from './ui.js';
 import { exportieren, importieren, letzterExportText } from './backup.js';
@@ -227,10 +228,21 @@ export async function renderMehr(view) {
         <button class="mini" data-a="band-runter" data-i="${i}" ${i === b.length - 1 ? 'disabled style="opacity:.3"' : ''} aria-label="schwerer">↓</button></div>`).join('')}
       <p class="info">Oben = dünnstes Band (wenig Hilfe), unten = dickstes Band (viel Hilfe).</p>
     </div>
-    <div class="titel2">HAUTPFLEGE</div>
+    <div class="titel2">BEREICHE</div>
+    <div class="chart">
+      ${Object.entries(MODULE).map(([k, t]) => `<label class="feld"><span>${esc(t)}</span><input type="checkbox" data-modul="${k}" ${modulAn(k) ? 'checked' : ''}></label>`).join('')}
+      <p class="info">Ausgeschaltete Bereiche verschwinden aus der App. Ihre Daten bleiben gespeichert.</p>
+    </div>
+    ${modulAn('haut') ? `<div class="titel2">HAUTPFLEGE</div>
     <div class="chart">
       <p class="info">Wochenplan, Erinnerungs-Zeiten (Push) und Öffnungsdaten der Produkte.</p>
       <button class="knopf" data-a="haut-einst">🧴 Haut-Einstellungen</button>
+    </div>` : ''}
+    <div class="titel2">PLAN-DATEI</div>
+    <div class="chart">
+      <p class="info">Plan${S.einst.eigenerPlan ? ` „${esc(S.einst.planName || 'Eigener Plan')}“` : ''}: Tage, Übungen und Bereiche als Datei, z. B. für ein zweites iPhone. Beim Laden wird nur der Plan ersetzt, gespeicherte Trainings bleiben.</p>
+      <button class="knopf" data-a="plan-export">📤 Plan als Datei teilen</button>
+      <button class="knopf" data-a="plan-import">📥 Plan-Datei laden</button>
     </div>
     <div class="titel2">BACKUP</div>
     <div class="chart">
@@ -246,7 +258,7 @@ export async function renderMehr(view) {
     </div>
     <p class="info pad" style="text-align:center">Version ${esc(version)}</p>`;
   view.onclick = mehrKlick;
-  view.onchange = null;
+  view.onchange = mehrAenderung;
 }
 
 async function appVersion() {
@@ -254,6 +266,15 @@ async function appVersion() {
     const k = (await caches.keys()).filter(x => x.startsWith('gymapp-')).sort().pop();
     return k ? k.replace('gymapp-', '') : 'ohne Offline-Speicher';
   } catch { return '?'; }
+}
+
+async function mehrAenderung(e) {
+  const k = e.target.dataset?.modul;
+  if (!k) return;
+  await setEinst('module', { ...(S.einst.module || {}), [k]: e.target.checked });
+  toast(e.target.checked ? `✅ ${MODULE[k].split(' (')[0]} an` : `${MODULE[k].split(' (')[0]} aus`);
+  // Tab-Leiste anpassen (Haut-Tab ein-/ausblenden).
+  document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'mehr' } }));
 }
 
 async function mehrKlick(e) {
@@ -270,6 +291,8 @@ async function mehrKlick(e) {
     await setEinst('baender', b);
   } else if (a === 'export') await exportieren();
   else if (a === 'import') { importieren(() => location.reload()); return; }
+  else if (a === 'plan-export') { await planExportieren(); return; }
+  else if (a === 'plan-import') { planImportieren(() => document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'plan' } }))); return; }
   else if (a === 'haut-einst') { document.dispatchEvent(new CustomEvent('gym-tab', { detail: { tab: 'haut', modus: 'einst' } })); return; }
   else if (a === 'persist') {
     const ok = await dauerhaftAnfragen();

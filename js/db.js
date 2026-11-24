@@ -82,6 +82,18 @@ export async function vieleSpeichern(eintraege) {
   return fertig(tx);
 }
 
+// Speichern UND Löschen in EINEM Schritt (z. B. Plan ersetzen): { store, wert } oder { store, loeschen: key }.
+export async function vieleAendern(eintraege) {
+  const db = await oeffnen();
+  const stores = [...new Set(eintraege.map(e => e.store))];
+  const tx = db.transaction(stores, 'readwrite');
+  for (const e of eintraege) {
+    if ('loeschen' in e) tx.objectStore(e.store).delete(e.loeschen);
+    else tx.objectStore(e.store).put(e.wert);
+  }
+  return fertig(tx);
+}
+
 // Alles ersetzen (Backup-Import) – in einem Schritt: klappt etwas nicht, bleibt alles wie vorher.
 export async function allesErsetzen(daten) {
   const db = await oeffnen();

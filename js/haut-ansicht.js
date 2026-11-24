@@ -1,5 +1,5 @@
 // Haut-Tab (Entwurf 3: Wochenplan oben, Liste zum Abhaken, Kalender der letzten 14 Tage) und Haut-Einstellungen.
-import { S, setEinst, speichereHaut } from './store.js';
+import { S, setEinst, speichereHaut, modulAn } from './store.js';
 import {
   WIRKSTOFFE, HAUT_WOCHENTAGE, HAUT_WOCHENTAGE_LANG, wirkstoffAm, wirkstoffFuer, schritteFuer, teilStand,
   hautSerie, tagStatus, haltbarkeit, zeitOptionen, istGueltigeZeit,
@@ -26,6 +26,7 @@ const fmtMonat = s => parseDatum(s).toLocaleDateString('de-DE', { day: 'numeric'
 
 // Karte „Heute Abend: …“ für den Heute-Tab (Trainings- und Restday).
 export function hautKarteHtml() {
+  if (!modulAn('haut')) return '';
   // Mit ✕ für heute ausgeblendet? (Der Haut-Tab bleibt natürlich da.)
   if ((S.einst.erinnerungAus || {}).hautKarte === heute()) return '';
   const d = trainingsDatum();
@@ -48,6 +49,7 @@ export function hautKarteHtml() {
 
 // Erinnerung, wenn das Retinal zu lange offen ist (für den Heute-Tab und den Haut-Tab).
 export function hautErinnerungen() {
+  if (!modulAn('haut')) return [];
   const d = heute();
   if ((S.einst.erinnerungAus || {}).retinal === d) return [];
   const out = [];

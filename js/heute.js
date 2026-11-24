@@ -1,5 +1,5 @@
 // Heute-Bildschirm: Tag A/B, Supersatz-Paare, Satz eintragen mit einem Tipp, Pausentimer.
-import { S, speichereEinheit, setEinst, speichereUebung } from './store.js';
+import { S, speichereEinheit, setEinst, speichereUebung, modulAn } from './store.js';
 import {
   tagHeute, eintragFuer, sichereEinheit, plaetze, reihenfolge, satzVon, vorschlag,
   wochenStand, faelligeErinnerungen, tagIds, zusammenfassung, zusammenfassungHtml, istUebersprungen, hatSaetze,
@@ -79,6 +79,7 @@ function naechsterPlatz() {
 
 // Rang-Abzeichen oben + Aufstieg melden.
 function rangKnopf() {
+  if (!modulAn('rang')) return '';
   const g = gesamtRang();
   const alt = S.einst.letzterRang;
   if (alt == null || g.i !== alt) {
@@ -202,7 +203,7 @@ function renderSheet(sheet, aktiv) {
     const z = zusammenfassung(ctx.einheit);
     const xp = ctx.einheit ? xpFuer(ctx.einheit.id) : 0;
     if (fertigZu()) { sheet.innerHTML = ''; return; } // mit ✕ eingeklappt
-    html += `<div class="fertig"><button class="weg-x" data-a="fertig-zu" aria-label="Zusammenfassung ausblenden">✕</button><b>${hatSaetze(ctx.einheit) ? `💪 Training geschafft! <span class="up">+${xp} XP</span>` : '⏭ Alle Sätze übersprungen'}</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
+    html += `<div class="fertig"><button class="weg-x" data-a="fertig-zu" aria-label="Zusammenfassung ausblenden">✕</button><b>${hatSaetze(ctx.einheit) ? `💪 Training geschafft!${modulAn('rang') ? ` <span class="up">+${xp} XP</span>` : ''}` : '⏭ Alle Sätze übersprungen'}</b><span class="muted">Diese Woche ${w.anzahl}/${w.ziel} · Kreis antippen = Satz ändern</span>${z ? zusammenfassungHtml(z) : ''}</div>`;
     sheet.innerHTML = html;
     return;
   }

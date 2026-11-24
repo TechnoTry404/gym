@@ -1,6 +1,6 @@
 // Service Worker: macht die App offline nutzbar und lädt Updates.
 // WICHTIG bei jedem Update: VERSION erhöhen (z. B. 1.0.1). Nur dann erkennt das iPhone die neue Version.
-const VERSION = '1.10.0';
+const VERSION = '1.12.0';
 const CACHE = 'gymapp-' + VERSION;
 
 const DATEIEN = [
@@ -18,6 +18,7 @@ const DATEIEN = [
   'js/haut-ansicht.js',
   'js/heute.js',
   'js/plan.js',
+  'js/plandatei.js',
   'js/progression.js',
   'js/push.js',
   'js/rang.js',
