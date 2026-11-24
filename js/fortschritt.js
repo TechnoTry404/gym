@@ -6,7 +6,13 @@ import { linie, balken } from './charts.js';
 import { gesamtRang, rangChip, RAENGE, XP_GRENZEN, kraftGrenzen, koerpergewicht as koerpergewichtRang } from './rang.js';
 import { RANG_STANDARDS } from './plan.js';
 import { messungEintragen, bandPunkt, modal, schliesseModal } from './ui.js';
-import { esc, heute, addTage, fmtZahl, fmtDatumLang, fmtDatumKurz, vorTagen } from './util.js';
+import { esc, heute, addTage, fmtZahl, fmtDatumLang, fmtDatumKurz, vorTagen, istLb, kgZuLb, rundeLb } from './util.js';
+
+// Gewicht anzeigen wie an der Maschine: lb-Übungen in lb (≈ kg), sonst kg mit höchstens 1 Nachkommastelle.
+function gw(kg, ex) {
+  if (istLb(ex)) return `${fmtZahl(rundeLb(kgZuLb(kg)))} lb (≈ ${fmtZahl(Math.round(kg * 10) / 10)} kg)`;
+  return `${fmtZahl(Math.round(kg * 10) / 10)} kg`;
+}
 
 let modus = 'kraft';          // kraft | koerper | verlauf
 let unter = null;             // null | 'liste' | {uebung} | {einheit}
@@ -202,12 +208,12 @@ function satzText(ex, en) {
   if (ex.art === 'hantel' || ex.art === 'maschine') {
     const kg = x => (typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0);
     const b = [...s].sort((x, y) => kg(y) * (1 + y.wdh / 30) - kg(x) * (1 + x.wdh / 30))[0];
-    return `${fmtZahl(kg(b))} kg × ${b.wdh}`;
+    return `${gw(kg(b), ex)} × ${b.wdh}`;
   }
   if (ex.art === 'maschine-hilfe') {
     const kg = x => (typeof x.kg === 'number' ? x.kg : teile[x.teil]?.kg ?? 0);
     const b = [...s].sort((x, y) => kg(x) - kg(y) || y.wdh - x.wdh)[0];
-    return kg(b) > 0 ? `${fmtZahl(kg(b))} kg Hilfe × ${b.wdh}` : `ohne Hilfe × ${b.wdh}`;
+    return kg(b) > 0 ? `${gw(kg(b), ex)} Hilfe × ${b.wdh}` : `ohne Hilfe × ${b.wdh}`;
   }
   if (ex.art === 'koerper') return `${Math.max(...s.map(x => x.wdh))} Wdh.`;
   if (ex.art === 'band-widerstand') {
@@ -268,32 +274,59 @@ export function renderFortschritt(view) {
   view.onclick = klick;
 }
 
+// Kraft: oben die Gesamt-Veränderung, darunter ALLE Übungen des Plans nach Tag (auch die mit erst 1 Training).
 function kraft() {
+  const ersteE = einheitenSortiert().find(hatSaetze);
+  if (!ersteE) return `<div class="leer">Hier siehst du bald, wie stark du geworden bist.<br>Trag einfach dein erstes Training ein.</div>`;
   const alle = zusammenfassung('alle');
   const d30 = zusammenfassung('30');
-  const ersteE = einheitenSortiert().find(hatSaetze);
+  const plan = planUebungen().filter(ex => ex.art !== 'ausdauer'); // Laufband zählt nicht als Kraft
+  const vergleichbar = alleVergleiche('alle').length;
   const anzahl30 = S.einheiten.filter(e => hatSaetze(e) && e.datum >= addTage(heute(), -30)).length;
-  if (!alle) {
-    return `<div class="leer">Hier siehst du bald, wie stark du geworden bist.<br>Dafür braucht jede Übung mindestens 2 Trainings.</div>`;
-  }
-  let html = `
-    <button class="karte" data-a="liste" data-z="alle">
+  // Alles innerhalb der letzten 30 Tage? Dann wären beide Karten gleich → nur eine zeigen.
+  const nurEine = ersteE.datum >= addTage(heute(), -30);
+  const karte = (z, titel, zr) => `<button class="karte" data-a="liste" data-z="${zr}">
       <span class="tap">Details ›</span>
-      <div class="muted">Seit Tag 1 · ${esc(fmtDatumKurz(ersteE.datum))} → heute</div>
-      ${pctHtml(alle.pct)}
-      ${balkenHtml(alle)}
-    </button>
-    <button class="karte" data-a="liste" data-z="30">
-      <span class="tap">Details ›</span>
-      <div class="muted">Letzte 30 Tage · ${anzahl30} ${anzahl30 === 1 ? 'Training' : 'Trainings'}</div>
-      ${d30 ? pctHtml(d30.pct) + balkenHtml(d30) : '<div class="pct null">–</div><div class="muted">Noch zu wenig Trainings in den letzten 30 Tagen.</div>'}
+      <div class="muted">${titel}</div>
+      ${z ? pctHtml(z.pct) + balkenHtml(z) : '<div class="pct null">–</div><div class="muted">Noch kein Vergleich möglich.</div>'}
     </button>`;
+  let html = karte(alle, `${nurEine ? 'Seit Tag 1 (= letzte 30 Tage)' : 'Seit Tag 1'} · ${esc(fmtDatumKurz(ersteE.datum))} → heute`, 'alle');
+  if (!nurEine) html += karte(d30, `Letzte 30 Tage · ${anzahl30} ${anzahl30 === 1 ? 'Training' : 'Trainings'}`, '30');
+  html += `<p class="info pad">📊 <b>${vergleichbar} von ${plan.length} Übungen</b> sind schon vergleichbar. Eine Übung zählt ab ihrem 2. Training: Verglichen wird dein bester Satz von damals mit heute. Die Prozentzahl ist der Durchschnitt dieser Übungen.</p>`;
+
   const r = rekorde();
   if (r.length) {
     html += `<div class="titel2">🏆 NEUE REKORDE (30 TAGE)</div>`;
     html += r.map(x => `<button class="ex" data-a="uebung" data-u="${x.ex.id}"><div class="n"><b>${esc(x.ex.name)}</b><span>${esc(satzText(x.ex, x.punkt.eintrag))} · ${esc(vorTagen(x.punkt.datum))}</span></div><div class="badge">Rekord</div></button>`).join('');
   }
+
+  // Alle Übungen, nach Trainingstag gruppiert (jede Übung nur einmal, beim ersten Tag).
+  const gezeigt = new Set();
+  for (const tag of Object.values(S.tage).sort((a, b) => a.id.localeCompare(b.id))) {
+    const zeilen = [];
+    for (const id of tag.paare.flat()) {
+      const ex = S.uebungen[id];
+      if (!ex || gezeigt.has(id) || ex.art === 'ausdauer') continue;
+      gezeigt.add(id);
+      zeilen.push(kraftZeile(ex));
+    }
+    if (zeilen.length) html += `<div class="titel2">TAG ${esc(tag.id)} · ${esc(tag.name.toUpperCase())}</div>` + zeilen.join('');
+  }
   return html;
+}
+
+function kraftZeile(ex) {
+  const v = verlaufUebung(ex);
+  if (!v.length) {
+    return `<div class="ex"><div class="n"><b>${esc(ex.name)}</b><span>Noch nicht trainiert</span></div><div class="badge flat">neu</div></div>`;
+  }
+  const letzte = v[v.length - 1];
+  const vg = vergleich(ex, 'alle');
+  if (!vg) {
+    return `<button class="ex" data-a="uebung" data-u="${ex.id}"><div class="n"><b>${esc(ex.name)}</b><span>Start: ${esc(satzText(ex, letzte.eintrag))} · Vergleich ab dem 2. Training</span></div><div class="badge flat">Start</div><span class="chev">›</span></button>`;
+  }
+  const pfeil = vg.klasse === 'up' ? '↑' : vg.klasse === 'down' ? '↓' : '=';
+  return `<button class="ex" data-a="uebung" data-u="${ex.id}"><div class="n"><b>${esc(ex.name)}</b><span>${esc(satzText(ex, vg.a.eintrag))} → ${esc(satzText(ex, vg.b.eintrag))} ${pfeil}</span></div>${badge(ex, vg)}<span class="chev">›</span></button>`;
 }
 
 function listeUebungen() {
@@ -326,7 +359,8 @@ function detailUebung(id) {
   if (ex.art === 'hantel' || ex.art === 'maschine' || ex.art === 'maschine-hilfe') {
     titel = ex.art === 'hantel' ? 'Gewicht pro Hantel (kg)' : ex.art === 'maschine' ? 'Gewicht (kg)' : 'Unterstützung (kg) – weniger ist besser';
     const best = ex.art === 'maschine-hilfe' ? Math.min : Math.max;
-    punkte = v.map(p => ({ datum: p.datum, wert: best(...p.eintrag.saetze.map(s => (typeof s.kg === 'number' ? s.kg : p.eintrag.ziel.teile[s.teil]?.kg ?? 0))) }));
+    if (istLb(ex)) titel = titel.replace('(kg)', '(in kg umgerechnet)');
+    punkte = v.map(p => ({ datum: p.datum, wert: Math.round(best(...p.eintrag.saetze.map(s => (typeof s.kg === 'number' ? s.kg : p.eintrag.ziel.teile[s.teil]?.kg ?? 0))) * 10) / 10 }));
   } else if (ex.art === 'band-hilfe' && ex.frei) {
     titel = 'Freie Wiederholungen (bester Satz)';
     punkte = v.map(p => ({ datum: p.datum, wert: Math.max(0, ...p.eintrag.saetze.filter(s => p.eintrag.ziel.teile[s.teil]?.typ === 'frei' || s.band === FREI).map(s => s.wdh)) }));

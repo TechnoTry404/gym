@@ -101,6 +101,10 @@ async function start() {
       setTimeout(() => toast(text, 4000), 900);
     }
   } catch { /* egal */ }
+  try {
+    const k = sessionStorage.getItem('gym-korrektur');
+    if (k) { sessionStorage.removeItem('gym-korrektur'); setTimeout(() => toast(`🔧 Kabelrudern: alte Werte von lb in kg umgerechnet (${k} Trainings)`, 4500), 1500); }
+  } catch { /* egal */ }
   dauerhaftAnfragen();
   if (einheitHeute()) timer.bildschirmWach();
   registriereServiceWorker();

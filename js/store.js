@@ -2,7 +2,7 @@
 import * as db from './db.js';
 import { STANDARD_UEBUNGEN, STANDARD_TAGE, STANDARD_EINSTELLUNGEN, PLAN_VERSION, TAUSCH_V3, TAUSCH_V4 } from './plan.js';
 import { produkteErgaenzen, STANDARD_HAUT_ZEITEN } from './haut.js';
-import { heute, toast } from './util.js';
+import { heute, toast, LB } from './util.js';
 
 export const S = { uebungen: {}, tage: {}, einheiten: [], messungen: [], einst: {}, haut: {} };
 
@@ -31,6 +31,48 @@ export async function ladeAlles() {
     // Eigener Plan (aus einer Plan-Datei): nie durch den Standardplan ersetzen.
     if (S.einst.eigenerPlan) await setEinst('planVersion', PLAN_VERSION);
     else await planUmstellen();
+  }
+  if (!S.einst.korrKabelrudernLb) await kabelrudernKorrigieren();
+}
+
+// Einmalige Korrektur (Wunsch des Nutzers, 24.11.2026): Beim Kabelrudern wurden die Zahlen der Maschine in lb
+// abgelesen, aber als kg gespeichert. Nur „glatte“ Werte (z. B. 50 oder 52,5) sind solche abgelesenen Zahlen;
+// Werte, die schon über den lb-Umschalter umgerechnet wurden (z. B. 45,359), bleiben unverändert.
+export function kabelrudernLbKorrektur(einheiten) {
+  const istAbgelesen = kg => typeof kg === 'number' && kg > 0 && Number.isInteger(Math.round(kg * 1000) / 500);
+  const umrechnen = kg => (istAbgelesen(kg) ? Math.round(kg * LB * 1000) / 1000 : kg);
+  const geaendert = [];
+  for (const e of einheiten) {
+    let neu = null;
+    for (const [i, en] of (e.eintraege || []).entries()) {
+      if (en.uebung !== 'kabelrudern') continue;
+      const alt = JSON.stringify(en);
+      const korr = {
+        ...en,
+        saetze: (en.saetze || []).map(x => ({ ...x, ...(typeof x.kg === 'number' ? { kg: umrechnen(x.kg) } : {}) })),
+        ziel: en.ziel ? { ...en.ziel, teile: (en.ziel.teile || []).map(t => ({ ...t, ...(typeof t.kg === 'number' ? { kg: umrechnen(t.kg) } : {}) })) } : en.ziel,
+        zustand: en.zustand && typeof en.zustand.kg === 'number' ? { ...en.zustand, kg: umrechnen(en.zustand.kg) } : en.zustand,
+      };
+      if (JSON.stringify(korr) !== alt) {
+        neu = neu || { ...e, eintraege: [...e.eintraege] };
+        neu.eintraege[i] = korr;
+      }
+    }
+    if (neu) geaendert.push(neu);
+  }
+  return geaendert;
+}
+
+async function kabelrudernKorrigieren() {
+  const geaendert = kabelrudernLbKorrektur(S.einheiten);
+  await db.vieleSpeichern([
+    ...geaendert.map(wert => ({ store: 'einheiten', wert })),
+    { store: 'einstellungen', wert: { key: 'korrKabelrudernLb', wert: heute() } },
+  ]);
+  for (const e of geaendert) S.einheiten[S.einheiten.findIndex(x => x.id === e.id)] = e;
+  S.einst.korrKabelrudernLb = heute();
+  if (geaendert.length) {
+    try { sessionStorage.setItem('gym-korrektur', String(geaendert.length)); } catch { /* egal */ }
   }
 }
 
